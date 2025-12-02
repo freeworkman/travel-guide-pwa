@@ -1,7 +1,7 @@
 const CACHE_NAME = 'travel-guide-v1';
 const urlsToCache = [
   './',
-  './全球旅遊嚮導V1_1.html',
+  './index.html',
   './manifest.json'
 ];
 
@@ -24,3 +24,4 @@ self.addEventListener('fetch', event => {
     })
   );
 });
+
