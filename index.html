@@ -55,6 +55,25 @@
 
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
         
+        /* Numbered Marker Style */
+        .number-icon {
+            background-color: #0ea5e9;
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+            transition: transform 0.2s;
+        }
+        .number-icon:active, .marker-active .number-icon {
+            background-color: #ea580c;
+            transform: scale(1.2);
+            z-index: 100 !important;
+        }
+
         #aiModal, #historyModal, #weatherModal, #settingsModal, #shareModal { transition: opacity 0.3s ease-in-out; }
         #aiModal.hidden, #historyModal.hidden, #weatherModal.hidden, #settingsModal.hidden, #shareModal.hidden { opacity: 0; pointer-events: none; }
         #aiModal:not(.hidden), #historyModal:not(.hidden), #weatherModal:not(.hidden), #settingsModal:not(.hidden), #shareModal:not(.hidden) { opacity: 1; pointer-events: auto; }
@@ -64,34 +83,36 @@
 
         [contenteditable="true"] { border: 1px dashed #0ea5e9; padding: 2px; border-radius: 4px; background-color: #f0f9ff; outline: none; }
         [contenteditable="true"]:focus { border: 1px solid #0ea5e9; background-color: white; }
+        
+        /* Button Touch Targets */
+        .touch-btn { min-height: 44px; min-width: 44px; }
     </style>
 </head>
 <body>
 
-    <!-- 1. Core Utilities Script (Loaded First) -->
+    <!-- 1. Core Utilities & UI Logic (Loaded First) -->
     <script>
-        // Global Error Handler
-        window.onerror = function(msg, url, line, col, error) {
-            console.error("App Error:", msg, error);
+        window.onerror = function(msg, url, line, col, error) { 
+            // console.error("App Error:", msg, error); 
         };
-
-        // UI Helpers
-        window.showToast = function(msg) {
-            const t = document.getElementById('toast');
-            if(!t) return;
-            document.getElementById('toastMsg').innerText = msg;
-            t.classList.remove('hidden');
-            setTimeout(() => t.classList.add('hidden'), 3000);
+        
+        // UI Utils - Defined early to avoid ReferenceError
+        window.showToast = function(msg) { 
+            const t = document.getElementById('toast'); 
+            if(!t) return; 
+            document.getElementById('toastMsg').innerText = msg; 
+            t.classList.remove('hidden'); 
+            setTimeout(() => t.classList.add('hidden'), 3000); 
         };
-
-        window.closeModal = function(id) {
-            document.getElementById(id).classList.add('hidden');
+        
+        window.closeModal = function(id) { 
+            document.getElementById(id).classList.add('hidden'); 
         };
-
+        
         // Safe Storage
-        window.safeStorage = {
-            getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } },
-            setItem: (key, val) => { try { localStorage.setItem(key, val); } catch (e) { } }
+        window.safeStorage = { 
+            getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } }, 
+            setItem: (key, val) => { try { localStorage.setItem(key, val); } catch (e) { } } 
         };
 
         // Clipboard Helper
@@ -107,23 +128,59 @@
                 catch (err) { document.body.removeChild(textArea); return false; }
             }
         };
+
+        // --- Moved UI Triggers Here to ensure they exist when HTML is parsed ---
+        window.openAIModal = () => document.getElementById('aiModal').classList.remove('hidden');
+        window.openHistoryModal = () => document.getElementById('historyModal').classList.remove('hidden');
+        window.openShareModal = () => document.getElementById('shareModal').classList.remove('hidden');
+        
+        window.openSettingsModal = () => {
+            const savedKey = window.safeStorage.getItem('gemini_api_key');
+            if(savedKey) document.getElementById('settingsApiKey').value = savedKey;
+            document.getElementById('settingsModal').classList.remove('hidden');
+        };
+
+        window.toggleIosGuide = () => {
+             const guide = document.getElementById('iosGuide');
+             const arrow = document.getElementById('iosGuideArrow');
+             if (guide.classList.contains('hidden')) {
+                 guide.classList.remove('hidden');
+                 arrow.classList.add('rotate-180');
+             } else {
+                 guide.classList.add('hidden');
+                 arrow.classList.remove('rotate-180');
+             }
+        };
+
+        window.fillExamplePrompt = (e) => {
+            e.preventDefault();
+            const promptInput = document.getElementById('aiPromptInput');
+            const startDateInput = document.getElementById('aiStartDate');
+            promptInput.value = "規劃一個北海道 5 天 4 夜的冬季行程，想要看企鵝散步、吃帝王蟹、泡溫泉，交通以大眾運輸為主。";
+            const date = new Date();
+            date.setMonth(date.getMonth() + 1);
+            startDateInput.value = date.toISOString().split('T')[0];
+        };
     </script>
 
     <!-- Header -->
-    <header class="bg-sky-500 text-white p-3 shadow-lg flex justify-between items-center">
-        <div class="flex items-center gap-2">
-            <div class="bg-white/20 p-2 rounded-full"><i class="fa-solid fa-earth-americas text-xl"></i></div>
+    <header class="bg-sky-500 text-white p-3 shadow-lg flex justify-between items-center z-20">
+        <div class="flex items-center gap-3">
+            <div class="bg-white/20 p-2.5 rounded-full"><i class="fa-solid fa-earth-americas text-2xl"></i></div>
             <div>
-                <h1 class="font-bold text-lg leading-tight">全球旅遊嚮導</h1>
-                <p class="text-[10px] text-sky-100 uppercase tracking-wider flex items-center gap-1">AI Planner <span id="modeBadge" class="bg-white/20 px-1 rounded text-[8px]">Cloud</span></p>
+                <h1 class="font-bold text-xl leading-tight">全球旅遊嚮導</h1>
+                <p class="text-xs text-sky-100 uppercase tracking-wider flex items-center gap-1">AI Planner <span id="modeBadge" class="bg-white/20 px-1.5 py-0.5 rounded text-[10px]">Cloud</span></p>
             </div>
         </div>
         <div class="flex gap-2 items-center">
-            <button onclick="openSettingsModal()" id="settingsBtn" class="bg-white/10 hover:bg-white/20 text-white text-xs px-2 py-1.5 rounded-full flex items-center gap-1 transition-colors border border-white/20" title="連結 AI"><i class="fa-solid fa-link text-[10px]"></i> <span id="keyStatusText" class="hidden md:inline">連結 AI</span></button>
-            <button onclick="openShareModal()" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-sm flex items-center gap-1 active:scale-95 border border-white/20"><i class="fa-solid fa-share-nodes"></i> <span class="hidden md:inline">分享</span></button>
-            <button onclick="openHistoryModal()" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-sm flex items-center gap-1 active:scale-95 border border-white/20"><i class="fa-solid fa-folder-open"></i> <span class="hidden md:inline">行程</span></button>
-            <button onclick="saveCurrentItinerary()" class="bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-sm flex items-center gap-1 active:scale-95 border border-white/20"><i class="fa-solid fa-floppy-disk"></i> <span class="hidden md:inline">儲存</span></button>
-            <button onclick="openAIModal()" class="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-md flex items-center gap-1 active:scale-95 border border-white/20"><i class="fa-solid fa-wand-magic-sparkles"></i> <span class="hidden md:inline">規劃</span></button>
+            <button onclick="openSettingsModal()" id="settingsBtn" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full flex items-center gap-2 transition-colors border border-white/20 touch-btn" title="連結 AI">
+                <i id="settingsIcon" class="fa-solid fa-link text-lg"></i> 
+                <span id="keyStatusText" class="hidden md:inline text-sm font-bold">連結 AI</span>
+            </button>
+            <button onclick="openShareModal()" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-share-nodes text-lg"></i> <span class="hidden md:inline">分享</span></button>
+            <button onclick="openHistoryModal()" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-folder-open text-lg"></i> <span class="hidden md:inline">行程</span></button>
+            <button onclick="saveCurrentItinerary()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-floppy-disk text-lg"></i> <span class="hidden md:inline">儲存</span></button>
+            <button onclick="openAIModal()" class="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white px-4 py-2 rounded-full font-bold shadow-md flex items-center gap-2 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-wand-magic-sparkles text-lg"></i> <span class="hidden md:inline">規劃</span></button>
         </div>
     </header>
 
@@ -131,34 +188,34 @@
     <main>
         <!-- Left Panel (Itinerary List) -->
         <section id="itineraryPanel" class="mobile-tab-content active panel-container md:w-[450px] bg-white border-r border-slate-200">
-            <div class="bg-sky-50 p-2 border-b border-sky-100 flex justify-between items-center text-xs text-sky-800 select-none shrink-0" id="headerInfo">
-                <div class="flex gap-2">
-                    <span class="flex items-center gap-1 cursor-pointer hover:bg-sky-100 px-2 py-1 rounded transition-colors" onclick="toggleCurrency()"><i class="fa-solid fa-coins text-sky-600"></i> <span id="headerCurrency" class="font-medium">--</span><i class="fa-solid fa-rotate text-[10px] ml-1 text-sky-400"></i></span>
-                    <span class="flex items-center gap-1 cursor-pointer hover:bg-sky-100 px-2 py-1 rounded transition-colors" onclick="openWeatherModal()"><i class="fa-solid fa-cloud-sun text-sky-600"></i> <span id="headerWeather" class="font-medium">--</span><i class="fa-solid fa-list-ul text-[10px] ml-1 text-sky-400"></i></span>
+            <div class="bg-sky-50 p-3 border-b border-sky-100 flex justify-between items-center text-sm text-sky-800 select-none shrink-0" id="headerInfo">
+                <div class="flex gap-3">
+                    <span class="flex items-center gap-2 cursor-pointer hover:bg-sky-100 px-2.5 py-1.5 rounded transition-colors" onclick="toggleCurrency()"><i class="fa-solid fa-coins text-sky-600 text-lg"></i> <span id="headerCurrency" class="font-medium">--</span><i class="fa-solid fa-rotate text-xs ml-1 text-sky-400"></i></span>
+                    <span class="flex items-center gap-2 cursor-pointer hover:bg-sky-100 px-2.5 py-1.5 rounded transition-colors" onclick="openWeatherModal()"><i class="fa-solid fa-cloud-sun text-sky-600 text-lg"></i> <span id="headerWeather" class="font-medium">--</span><i class="fa-solid fa-list-ul text-xs ml-1 text-sky-400"></i></span>
                 </div>
-                <button id="editToggleBtn" onclick="toggleEditMode()" class="text-sky-600 hover:bg-sky-100 px-2 py-1 rounded transition-colors flex items-center gap-1"><i class="fa-regular fa-pen-to-square"></i> <span id="editBtnText">編輯</span></button>
+                <button id="editToggleBtn" onclick="toggleEditMode()" class="text-sky-600 hover:bg-sky-100 px-3 py-1.5 rounded transition-colors flex items-center gap-2 font-medium"><i class="fa-regular fa-pen-to-square text-lg"></i> <span id="editBtnText">編輯</span></button>
             </div>
-            <div id="dayTabsContainer" class="flex overflow-x-auto bg-white p-2 border-b border-slate-100 gap-2 shrink-0 no-scrollbar shadow-sm"></div>
+            <div id="dayTabsContainer" class="flex overflow-x-auto bg-white p-2 border-b border-slate-100 gap-2 shrink-0 no-scrollbar shadow-sm" style="min-height: 60px;"></div>
             <div id="contentList" class="p-4 space-y-4 bg-slate-50"></div> 
         </section>
 
         <!-- Right Panel (Map) -->
         <section id="mapPanel" class="mobile-tab-content panel-container w-full md:flex-1 bg-slate-100">
             <div id="map"></div>
-            <div class="absolute top-4 right-4 z-[400] flex flex-col gap-2">
-                <button onclick="map.zoomIn()" class="w-10 h-10 bg-white rounded shadow text-slate-600 hover:text-sky-600 font-bold text-xl">+</button>
-                <button onclick="map.zoomOut()" class="w-10 h-10 bg-white rounded shadow text-slate-600 hover:text-sky-600 font-bold text-xl">-</button>
+            <div class="absolute top-4 right-4 z-[400] flex flex-col gap-3">
+                <button onclick="map.zoomIn()" class="w-12 h-12 bg-white rounded shadow text-slate-600 hover:text-sky-600 font-bold text-2xl flex items-center justify-center">+</button>
+                <button onclick="map.zoomOut()" class="w-12 h-12 bg-white rounded shadow text-slate-600 hover:text-sky-600 font-bold text-2xl flex items-center justify-center">-</button>
             </div>
-            <button onclick="refreshMapLayout()" class="absolute bottom-20 right-4 z-[400] w-10 h-10 bg-white rounded-full shadow text-slate-600 hover:text-sky-600 flex items-center justify-center md:hidden" title="重整地圖">
-                <i class="fa-solid fa-rotate"></i>
+            <button onclick="refreshMapLayout()" class="absolute bottom-24 right-4 z-[400] w-12 h-12 bg-white rounded-full shadow text-slate-600 hover:text-sky-600 flex items-center justify-center md:hidden" title="重整地圖">
+                <i class="fa-solid fa-rotate text-lg"></i>
             </button>
         </section>
     </main>
 
     <!-- Mobile Nav -->
-    <nav class="md:hidden flex h-16 bg-white border-t border-slate-200 shrink-0 z-30 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
-        <button onclick="toggleMobileView('list')" id="nav-list" class="flex-1 flex flex-col items-center justify-center text-sky-600"><i class="fa-solid fa-list-check text-xl mb-1"></i><span class="text-[10px] font-bold">行程</span></button>
-        <button onclick="toggleMobileView('map')" id="nav-map" class="flex-1 flex flex-col items-center justify-center text-slate-400"><i class="fa-regular fa-map text-xl mb-1"></i><span class="text-[10px] font-bold">地圖</span></button>
+    <nav class="md:hidden flex h-20 bg-white border-t border-slate-200 shrink-0 z-30 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
+        <button onclick="toggleMobileView('list')" id="nav-list" class="flex-1 flex flex-col items-center justify-center text-sky-600 touch-btn"><i class="fa-solid fa-list-check text-2xl mb-1"></i><span class="text-xs font-bold">行程列表</span></button>
+        <button onclick="toggleMobileView('map')" id="nav-map" class="flex-1 flex flex-col items-center justify-center text-slate-400 touch-btn"><i class="fa-regular fa-map text-2xl mb-1"></i><span class="text-xs font-bold">地圖模式</span></button>
     </nav>
 
     <!-- Share Modal -->
@@ -166,45 +223,35 @@
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100 flex flex-col max-h-[90vh]">
             <div class="bg-sky-600 p-4 flex justify-between items-center text-white shrink-0">
                 <h3 class="font-bold text-lg"><i class="fa-solid fa-share-nodes mr-2"></i>分享行程</h3>
-                <button onclick="closeModal('shareModal')" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+                <button onclick="closeModal('shareModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button>
             </div>
-            <div class="p-6 space-y-4 overflow-y-auto">
-                <button onclick="copyWebLink()" class="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl text-sm font-bold hover:from-pink-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 shadow-md">
-                    <i class="fa-solid fa-link"></i> 複製應用程式連結
+            <div class="p-6 space-y-5 overflow-y-auto text-base">
+                <button onclick="copyWebLink()" class="w-full py-3.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-bold hover:from-pink-600 hover:to-purple-700 shadow-md flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-link text-lg"></i> 複製應用程式連結
                 </button>
-                <p class="text-[10px] text-slate-400 text-center -mt-2 mb-4">
-                    分享 https://fluffy-dragon-1a2b3c.netlify.app/ 給朋友。
-                </p>
-                
+                <p class="text-sm text-slate-400 text-center -mt-2">分享網址給朋友。</p>
                 <div class="border-t border-slate-100 my-2"></div>
-
-                <button onclick="shareToLine()" class="w-full py-3 bg-[#06C755] text-white rounded-xl text-sm font-bold hover:bg-[#05b64d] transition-colors flex items-center justify-center gap-2 shadow-sm"><i class="fa-brands fa-line text-xl"></i> 分享到 LINE</button>
-
+                <button onclick="shareToLine()" class="w-full py-3.5 bg-[#06C755] text-white rounded-xl font-bold hover:bg-[#05b64d] shadow-sm flex items-center justify-center gap-2"><i class="fa-brands fa-line text-xl"></i> 分享到 LINE</button>
                 <div class="border-t border-slate-100 my-2"></div>
-                <button onclick="shareAsCode()" class="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm"><i class="fa-solid fa-code"></i> 複製行程資料碼 (App互傳)</button>
-                <button onclick="copyItineraryText()" class="w-full py-3 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 border border-slate-200"><i class="fa-regular fa-copy"></i> 複製純文字</button>
+                <button onclick="shareAsCode()" class="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-sm flex items-center justify-center gap-2"><i class="fa-solid fa-code text-lg"></i> 複製行程資料碼 (App互傳)</button>
+                <button onclick="copyItineraryText()" class="w-full py-3.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 border border-slate-200 flex items-center justify-center gap-2"><i class="fa-regular fa-copy text-lg"></i> 複製純文字</button>
             </div>
         </div>
     </div>
 
     <!-- Other Modals (AI, History, Weather, Settings) -->
-    <div id="aiModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100"><div class="bg-gradient-to-r from-sky-500 to-blue-600 p-4 flex justify-between items-center text-white"><h3 class="font-bold text-lg"><i class="fa-solid fa-plane-up mr-2"></i>AI 行程規劃</h3><button onclick="closeModal('aiModal')" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button></div><div class="p-6"><div class="mb-4"><label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">出發日期</label><input type="date" id="aiStartDate" class="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 text-sm bg-slate-50 text-slate-700"></div><div class="mb-4"><label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">旅遊偏好</label><textarea id="aiPromptInput" class="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none resize-none text-sm bg-slate-50" rows="3" placeholder="例：規劃一個京都 5 天 4 夜的賞楓行程，要包含嵐山小火車..."></textarea></div><div class="text-right mb-4"><a href="#" onclick="fillExamplePrompt(event)" class="text-xs text-sky-500 hover:underline">⚡ 試試範例</a></div><div id="aiErrorMsg" class="hidden mt-2 text-red-500 text-xs flex items-center gap-1"><i class="fa-solid fa-circle-exclamation"></i> <span>發生錯誤，請稍後再試</span></div><div class="mt-6 flex gap-3"><button onclick="closeModal('aiModal')" class="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-200">取消</button><button onclick="window.handleGenerateClick()" id="generateBtn" class="flex-1 py-2.5 bg-sky-500 text-white rounded-lg text-sm font-bold hover:bg-sky-600 shadow-lg shadow-sky-200 flex justify-center items-center gap-2"><span>出發！</span><i class="fa-solid fa-paper-plane text-xs"></i></button></div></div></div></div>
-    <div id="historyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[80vh] flex flex-col overflow-hidden transform transition-all scale-100"><div class="bg-slate-800 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-lg"><i class="fa-solid fa-folder-open mr-2"></i>我的行程</h3><div class="flex items-center gap-3"><button onclick="importItinerary()" class="text-sky-300 hover:text-white text-sm font-bold flex items-center gap-1 transition-colors"><i class="fa-solid fa-file-import"></i> 匯入</button><button onclick="closeModal('historyModal')" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button></div></div><div id="historyList" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50"><div class="text-center text-slate-400 mt-10">載入中...</div></div></div></div>
-    <div id="weatherModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[70vh] flex flex-col overflow-hidden transform transition-all scale-100"><div class="bg-orange-500 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-lg"><i class="fa-solid fa-cloud-sun mr-2"></i>全程天氣概況</h3><button onclick="closeModal('weatherModal')" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button></div><div id="weatherList" class="flex-1 overflow-y-auto p-4 space-y-3 bg-orange-50"><div class="text-center text-slate-400 mt-10">載入中...</div></div></div></div>
-    <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100"><div class="bg-slate-800 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-lg"><i class="fa-solid fa-robot mr-2"></i>連結 Google AI</h3><button onclick="closeModal('settingsModal')" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button></div><div class="p-6 space-y-5"><div class="space-y-2"><p class="text-xs font-bold text-slate-400 uppercase tracking-wider">第一步：取得免費金鑰</p><a href="https://aistudio.google.com/app/apikey" target="_blank" class="flex items-center justify-between w-full py-3 px-4 bg-sky-50 text-sky-700 rounded-xl text-sm font-bold hover:bg-sky-100 transition-colors border border-sky-100 group"><span class="flex items-center gap-2"><i class="fa-brands fa-google text-lg"></i> 開啟 Google AI Studio</span><i class="fa-solid fa-arrow-up-right-from-square text-xs opacity-50 group-hover:opacity-100"></i></a><p class="text-[10px] text-slate-400 leading-tight">* 請登入 Google 帳號，點擊 "Create API key" -> 複製 <code>AIza</code> 開頭的文字。</p></div><div class="border-t border-slate-100"></div><div class="space-y-2"><p class="text-xs font-bold text-slate-400 uppercase tracking-wider">第二步：貼上並連結</p><div class="flex gap-2"><input type="password" id="settingsApiKey" class="flex-1 p-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-sky-500 outline-none" placeholder="在此貼上 API Key..."><button onclick="pasteApiKey()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 rounded-lg border border-slate-200 transition-colors flex flex-col items-center justify-center whitespace-nowrap" title="讀取剪貼簿"><i class="fa-regular fa-clipboard"></i><span class="text-[10px] font-bold">貼上</span></button></div></div><button onclick="saveSettings()" class="w-full py-3 bg-sky-600 text-white rounded-xl text-sm font-bold hover:bg-sky-700 shadow-lg shadow-sky-200 transition-transform active:scale-95 flex justify-center items-center gap-2"><i class="fa-solid fa-link"></i> 確認連結</button><div class="text-center pt-2"><button onclick="useDemoMode()" class="text-xs text-slate-400 hover:text-slate-600 hover:underline">先使用模擬模式試玩</button></div></div></div></div>
+    <div id="aiModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100"><div class="bg-gradient-to-r from-sky-500 to-blue-600 p-4 flex justify-between items-center text-white"><h3 class="font-bold text-xl"><i class="fa-solid fa-plane-up mr-2"></i>AI 行程規劃</h3><button onclick="closeModal('aiModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div><div class="p-6 space-y-4"><div class="mb-2"><label class="block text-sm font-bold text-slate-500 mb-1 uppercase">出發日期</label><input type="date" id="aiStartDate" class="w-full p-3 border border-slate-200 rounded-lg text-base bg-slate-50 text-slate-700"></div><div class="mb-2"><label class="block text-sm font-bold text-slate-500 mb-1 uppercase">旅遊偏好</label><textarea id="aiPromptInput" class="w-full p-4 border border-slate-200 rounded-lg text-base bg-slate-50" rows="4" placeholder="例：規劃一個京都 5 天 4 夜的賞楓行程，要包含嵐山小火車..."></textarea></div><div class="text-right"><a href="#" onclick="fillExamplePrompt(event)" class="text-sm text-sky-500 hover:underline">⚡ 試試範例</a></div><div id="aiErrorMsg" class="hidden mt-2 text-red-500 text-sm flex items-center gap-1"><i class="fa-solid fa-circle-exclamation"></i> <span>發生錯誤</span></div><div class="mt-4 flex gap-4"><button onclick="closeModal('aiModal')" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200">取消</button><button onclick="window.handleGenerateClick()" id="generateBtn" class="flex-1 py-3 bg-sky-500 text-white rounded-xl font-bold hover:bg-sky-600 shadow-lg flex justify-center items-center gap-2"><span>出發！</span><i class="fa-solid fa-paper-plane"></i></button></div></div></div></div>
+    <div id="historyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[80vh] flex flex-col overflow-hidden transform transition-all scale-100"><div class="bg-slate-800 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-xl"><i class="fa-solid fa-folder-open mr-2"></i>我的行程</h3><div class="flex items-center gap-3"><button onclick="importItinerary()" class="text-sky-300 hover:text-white text-sm font-bold flex items-center gap-1 p-2"><i class="fa-solid fa-file-import text-lg"></i> 匯入</button><button onclick="closeModal('historyModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div></div><div id="historyList" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50"><div class="text-center text-slate-400 mt-10">載入中...</div></div></div></div>
+    <div id="weatherModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[70vh] flex flex-col overflow-hidden transform transition-all scale-100"><div class="bg-orange-500 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-xl"><i class="fa-solid fa-cloud-sun mr-2"></i>全程天氣概況</h3><button onclick="closeModal('weatherModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div><div id="weatherList" class="flex-1 overflow-y-auto p-4 space-y-3 bg-orange-50"><div class="text-center text-slate-400 mt-10">載入中...</div></div></div></div>
+    <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100"><div class="bg-slate-800 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-xl"><i class="fa-solid fa-robot mr-2"></i>連結 Google AI</h3><button onclick="closeModal('settingsModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div><div class="p-6 space-y-6"><div class="space-y-2"><p class="text-sm font-bold text-slate-400 uppercase">第一步：取得免費金鑰</p><a href="https://aistudio.google.com/app/apikey" target="_blank" class="flex items-center justify-between w-full py-3.5 px-5 bg-sky-50 text-sky-700 rounded-xl font-bold hover:bg-sky-100 transition-colors border border-sky-100 group"><span class="flex items-center gap-2"><i class="fa-brands fa-google text-xl"></i> 開啟 Google AI Studio</span><i class="fa-solid fa-arrow-up-right-from-square text-sm opacity-50 group-hover:opacity-100"></i></a></div><div class="border-t border-slate-100"></div><div class="space-y-2"><p class="text-sm font-bold text-slate-400 uppercase">第二步：貼上並連結</p><div class="flex gap-2"><input type="password" id="settingsApiKey" class="flex-1 p-3.5 border border-slate-300 rounded-lg text-base bg-white focus:ring-2 focus:ring-sky-500 outline-none" placeholder="在此貼上 API Key..."><button onclick="pasteApiKey()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 rounded-lg border border-slate-200 transition-colors flex flex-col items-center justify-center whitespace-nowrap" title="讀取剪貼簿"><i class="fa-regular fa-clipboard text-lg"></i><span class="text-xs font-bold">貼上</span></button></div></div><button onclick="saveSettings()" class="w-full py-3.5 bg-sky-600 text-white rounded-xl text-base font-bold hover:bg-sky-700 shadow-lg flex justify-center items-center gap-2"><i class="fa-solid fa-link"></i> 確認連結</button><div class="text-center pt-2"><button onclick="useDemoMode()" class="text-sm text-slate-400 hover:text-slate-600 hover:underline">先使用模擬模式試玩</button></div></div></div></div>
     
-    <div id="toast" class="hidden fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-full shadow-lg z-[100] text-sm font-bold flex items-center gap-2"><i class="fa-solid fa-check-circle text-green-400"></i> <span id="toastMsg">已儲存</span></div>
+    <div id="toast" class="hidden fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-5 py-3 rounded-full shadow-xl z-[100] text-base font-bold flex items-center gap-3"><i class="fa-solid fa-check-circle text-green-400 text-xl"></i> <span id="toastMsg">已儲存</span></div>
 
     <!-- Firebase & Hybrid Logic -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, Timestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-
-        window.safeStorage = {
-            getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } },
-            setItem: (key, val) => { try { localStorage.setItem(key, val); } catch (e) { } }
-        };
 
         let app, auth, db;
         let isLocalMode = false;
@@ -316,7 +363,7 @@
         function createHistoryItem(container, id, data, date) {
             const item = document.createElement('div');
             item.className = "bg-white p-4 rounded-xl border border-slate-200 hover:border-sky-400 cursor-pointer shadow-sm transition-all group relative";
-            item.innerHTML = `<div class="flex justify-between items-center"><div class="flex-1" onclick="window.loadItineraryWrapper('${id}')"><h4 class="font-bold text-slate-800 group-hover:text-sky-600">${data.title || '行程'}</h4><p class="text-xs text-slate-400 mt-1"><i class="fa-regular fa-clock"></i> ${date}</p></div><div class="flex items-center gap-2"><button onclick="event.stopPropagation(); window.deleteItinerary('${id}')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors z-20" title="刪除"><i class="fa-solid fa-trash"></i></button><i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-sky-500"></i></div></div>`;
+            item.innerHTML = `<div class="flex justify-between items-center"><div class="flex-1" onclick="window.loadItineraryWrapper('${id}')"><h4 class="font-bold text-slate-800 group-hover:text-sky-600 text-lg">${data.title || '行程'}</h4><p class="text-xs text-slate-400 mt-1"><i class="fa-regular fa-clock"></i> ${date}</p></div><div class="flex items-center gap-3"><button onclick="event.stopPropagation(); window.deleteItinerary('${id}')" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors z-20" title="刪除"><i class="fa-solid fa-trash text-lg"></i></button><i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-sky-500 text-lg"></i></div></div>`;
             if (!window.historyCache) window.historyCache = {};
             window.historyCache[id] = { data: data.data, meta: data.meta };
             container.appendChild(item);
@@ -395,6 +442,7 @@
             window.currentDocId = docId; 
             updateHeader(meta);
             renderTabs();
+            // Check for Summary View Request or Default
             const days = Object.keys(data);
             if(days.length > 0) switchDay(days[0]);
             isEditMode = false; updateEditUI();
@@ -424,6 +472,8 @@
         }
 
         function saveEdits() {
+            if(currentDay === 'summary') return; // No edit in summary
+            
             const dayData = window.currentItineraryData[currentDay];
             if (!dayData) return;
             const titleEl = document.getElementById('dayTitle');
@@ -465,7 +515,24 @@
         window.openSettingsModal = () => { const savedKey = window.safeStorage.getItem('gemini_api_key'); if(savedKey) document.getElementById('settingsApiKey').value = savedKey; document.getElementById('settingsModal').classList.remove('hidden'); };
         window.saveSettings = () => {
             const key = document.getElementById('settingsApiKey').value.trim();
-            if(key) { window.safeStorage.setItem('gemini_api_key', key); window.showToast("API Key 已儲存"); document.getElementById('keyStatusText').innerText = "已連結 AI"; document.querySelector('button[onclick="openSettingsModal()"] i').className = "fa-solid fa-check text-green-400"; document.getElementById('settingsBtn').classList.add('bg-green-500/10', 'border-green-400/30'); window.closeModal('settingsModal'); } else { alert("請輸入有效的 API Key"); }
+            if(key) {
+                window.safeStorage.setItem('gemini_api_key', key);
+                window.showToast("API Key 已儲存");
+                
+                // Safe UI updates
+                const statusText = document.getElementById('keyStatusText');
+                if(statusText) statusText.innerText = "已連結 AI";
+                
+                const icon = document.querySelector('#settingsBtn i');
+                if(icon) icon.className = "fa-solid fa-check text-green-400";
+                
+                const btn = document.getElementById('settingsBtn');
+                if(btn) btn.classList.add('bg-green-500/10', 'border-green-400/30');
+
+                window.closeModal('settingsModal');
+            } else {
+                alert("請輸入有效的 API Key");
+            }
         };
         window.useDemoMode = () => { window.closeModal('settingsModal'); window.runMockGeneration(); };
         window.pasteApiKey = async () => { try { const text = await navigator.clipboard.readText(); document.getElementById('settingsApiKey').value = text; } catch (err) { alert('無法讀取剪貼簿，請手動貼上'); } };
@@ -478,7 +545,6 @@
             const success = await window.copyToClipboard(url);
             if (success) alert("連結已複製！\n\n您可以將此連結貼給朋友，或在 Safari 中開啟。"); else alert("複製失敗");
         };
-
         window.shareAsCode = async () => {
             if (!window.currentItineraryData) return alert("無行程可分享");
             const jsonStr = JSON.stringify({ data: window.currentItineraryData, meta: window.currentMetaData });
@@ -531,29 +597,110 @@
 
         function renderTabs() {
             const container = document.getElementById('dayTabsContainer'); container.innerHTML = '';
+            
+            // Add Summary Tab
+            const summaryBtn = document.createElement('button');
+            summaryBtn.className = `day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all text-xs font-bold ${currentDay == 'summary' ? 'bg-sky-500 text-white shadow-md' : 'bg-slate-100 text-slate-600'}`;
+            summaryBtn.dataset.day = 'summary';
+            summaryBtn.onclick = () => switchDay('summary');
+            summaryBtn.innerHTML = `<i class="fa-solid fa-map"></i><br><span class="text-[12px]">總覽</span>`;
+            container.appendChild(summaryBtn);
+
             Object.keys(window.currentItineraryData).forEach(day => {
                 const btn = document.createElement('button');
-                btn.className = `day-btn flex-1 min-w-[60px] py-2 rounded-lg text-center transition-all text-xs font-bold ${day == currentDay ? 'bg-sky-500 text-white shadow-md' : 'bg-slate-100 text-slate-600'}`;
+                btn.className = `day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all text-xs font-bold ${day == currentDay ? 'bg-sky-500 text-white shadow-md' : 'bg-slate-100 text-slate-600'}`;
                 btn.dataset.day = day; btn.onclick = () => switchDay(day);
                 const dateStr = getDisplayDate(day);
-                btn.innerHTML = `${dateStr}<br><span class="font-normal opacity-80 text-[10px] truncate block px-1">查看</span>`;
+                btn.innerHTML = `${dateStr}<br><span class="font-normal opacity-80 text-[12px] truncate block px-1">查看</span>`;
                 container.appendChild(btn);
             });
             const tipsBtn = document.createElement('button');
-            tipsBtn.className = "day-btn flex-1 min-w-[60px] py-2 rounded-lg text-center transition-all bg-yellow-50 text-yellow-700 hover:bg-yellow-100 text-xs font-bold border border-yellow-200";
-            tipsBtn.onclick = () => renderTips(); tipsBtn.innerHTML = `<i class="fa-regular fa-lightbulb mb-1"></i><br>貼心提示`;
+            tipsBtn.className = "day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all bg-yellow-50 text-yellow-700 hover:bg-yellow-100 text-xs font-bold border border-yellow-200";
+            tipsBtn.onclick = () => renderTips(); tipsBtn.innerHTML = `<i class="fa-regular fa-lightbulb text-lg mb-1"></i><br><span class="text-[12px]">貼心提示</span>`;
             container.appendChild(tipsBtn);
         }
 
         function switchDay(day) {
             currentDay = day;
             document.querySelectorAll('.day-btn').forEach(btn => {
-                if (btn.dataset.day == day) btn.className = "day-btn flex-1 min-w-[60px] py-2 rounded-lg text-center transition-all text-xs font-bold bg-sky-500 text-white shadow-md";
-                else if(!btn.innerHTML.includes('貼心提示')) btn.className = "day-btn flex-1 min-w-[60px] py-2 rounded-lg text-center transition-all text-xs font-bold bg-slate-100 text-slate-600";
+                if (btn.dataset.day == day) btn.className = "day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all text-xs font-bold bg-sky-500 text-white shadow-md";
+                else if(btn.innerHTML.includes('貼心提示')) btn.className = "day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all bg-yellow-50 text-yellow-700 hover:bg-yellow-100 text-xs font-bold border border-yellow-200";
+                else btn.className = "day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all text-xs font-bold bg-slate-100 text-slate-600";
             });
+            
             const container = document.getElementById('contentList'); container.innerHTML = '';
             for (let id in markers) map.removeLayer(markers[id]); markers = {};
             if (currentPolyline) { map.removeLayer(currentPolyline); currentPolyline = null; }
+            
+            // SUMMARY VIEW LOGIC
+            if (day === 'summary') {
+                // Header
+                const header = document.createElement('div'); header.className = "mb-4";
+                header.innerHTML = `<div class="flex items-center gap-2"><h2 class="text-2xl font-bold text-sky-900">🗓️ 行程總覽</h2></div><p class="text-sm text-slate-500 mt-1">全地圖檢視模式 (依序標示)</p>`;
+                container.appendChild(header);
+
+                const bounds = [];
+                const allRouteCoords = [];
+                let globalStopIndex = 1;
+
+                Object.keys(window.currentItineraryData).forEach(dayKey => {
+                    const dayData = window.currentItineraryData[dayKey];
+                    const dayDate = getDisplayDate(dayKey);
+                    
+                    // Day Group Header in List
+                    const dayHeader = document.createElement('div');
+                    dayHeader.className = "sticky top-0 bg-sky-50/90 backdrop-blur px-3 py-2 rounded-lg font-bold text-sky-800 text-sm border border-sky-100 z-10 mb-2 shadow-sm";
+                    dayHeader.innerHTML = `${dayDate} - ${dayData.title.replace(/Day \d+:/,'').trim()}`;
+                    container.appendChild(dayHeader);
+
+                    dayData.stops.forEach((stop) => {
+                        const lat = parseFloat(stop.lat); const lng = parseFloat(stop.lng);
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                            allRouteCoords.push([lat, lng]);
+                            bounds.push([lat, lng]);
+
+                            // List Item (Compact)
+                            const item = document.createElement('div');
+                            item.className = "flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100 mb-2";
+                            item.innerHTML = `
+                                <div class="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shadow-sm shrink-0">${globalStopIndex}</div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-bold text-slate-800 text-sm truncate">${stop.name}</div>
+                                    <div class="text-xs text-slate-500 truncate"><i class="fa-regular fa-clock mr-1"></i>${stop.time}</div>
+                                </div>
+                            `;
+                            item.onclick = () => focusLocation(lat, lng);
+                            container.appendChild(item);
+
+                            // Map Marker (Numbered)
+                            const numberIcon = L.divIcon({
+                                className: 'custom-number-icon',
+                                html: `<div class="number-icon">${globalStopIndex}</div>`,
+                                iconSize: [30, 30],
+                                iconAnchor: [15, 15]
+                            });
+                            const marker = L.marker([lat, lng], { icon: numberIcon }).addTo(map).bindPopup(`<b>${globalStopIndex}. ${stop.name}</b><br>${dayDate}`);
+                            marker.on('click', () => focusLocation(lat, lng));
+                            markers[stop.id || Math.random()] = marker;
+                            
+                            globalStopIndex++;
+                        }
+                    });
+                });
+
+                // Draw Full Route
+                if (allRouteCoords.length > 1) {
+                    currentPolyline = L.polyline(allRouteCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '6, 6' }).addTo(map);
+                }
+
+                if (bounds.length > 0) {
+                    currentBounds = bounds;
+                    setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50] }); }, 200);
+                }
+                return; // Exit summary view logic
+            }
+
+            // DAILY VIEW LOGIC (Existing)
             const dayData = window.currentItineraryData[day]; if (!dayData) return;
             const headerWeatherEl = document.getElementById('headerWeather');
             if (dayData.weather) headerWeatherEl.innerText = dayData.weather; else headerWeatherEl.innerText = "--";
@@ -593,6 +740,7 @@
                     if(map.getContainer().offsetWidth > 0) map.flyToBounds(bounds, { padding: [50, 50], animate: true, duration: 1.5 });
                 }, 200); 
             }
+            
             if(isEditMode) updateEditUI();
         }
 
@@ -721,3 +869,5 @@
     </script>
 </body>
 </html>
+</html>
+
