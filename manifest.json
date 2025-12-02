@@ -1,8 +1,8 @@
 {
   "name": "全球旅遊嚮導",
-  "short_name": "旅遊嚮導",
+  "short_name": "全球旅遊嚮導",
   "description": "AI 支援的全球旅遊行程規劃應用",
-  "start_url": "./全球旅遊嚮導V1_1.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0ea5e9",
   "theme_color": "#0ea5e9",
@@ -30,3 +30,4 @@
     }
   ]
 }
+
