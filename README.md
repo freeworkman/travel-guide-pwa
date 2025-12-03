@@ -49,7 +49,7 @@
 #### iOS 用戶
 1. 用 **Safari** 打開：
    ```
-   https://heartfelt-crumble-323cc4.netlify.app/全球旅遊嚮導V1_1.html
+   https://heartfelt-crumble-323cc4.netlify.app/Index.html
    ```
 2. 點「分享」→「加入主屏幕」
 3. 完成！App 已安裝 ✨
@@ -57,7 +57,7 @@
 #### Android 用戶
 1. 用 **Chrome/Edge** 打開：
    ```
-   https://heartfelt-crumble-323cc4.netlify.app/全球旅遊嚮導V1_1.html
+   https://heartfelt-crumble-323cc4.netlify.app/Index.html
    ```
 2. 點右上角「安裝」按鈕
 3. 完成！App 已安裝 ✨
@@ -65,7 +65,7 @@
 #### 電腦用戶
 直接訪問：
 ```
-https://heartfelt-crumble-323cc4.netlify.app/全球旅遊嚮導V1_1.html
+https://heartfelt-crumble-323cc4.netlify.app/Index.html
 ```
 
 ---
@@ -383,7 +383,7 @@ Live PWA
 
 ```
 🌍 分享給朋友：
-https://heartfelt-crumble-323cc4.netlify.app/全球旅遊嚮導V1_1.html
+https://heartfelt-crumble-323cc4.netlify.app/Index.html
 ```
 
 ---
@@ -405,3 +405,4 @@ https://heartfelt-crumble-323cc4.netlify.app/全球旅遊嚮導V1_1.html
 [⬆ 回到頂部](#-全球旅遊嚮導---ai-行程規劃應用)
 
 </div>
+
