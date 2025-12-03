@@ -190,6 +190,7 @@
             <button onclick="openHistoryModal()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-folder-open text-base"></i> <span>行程</span></button>
             <button onclick="saveCurrentItinerary()" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-floppy-disk text-base"></i> <span>儲存</span></button>
             <button onclick="openAIModal()" class="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white px-3 py-2 rounded-full font-bold shadow-md flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-wand-magic-sparkles text-base"></i> <span>規劃</span></button>
+            <button onclick="window.openFlightSearch()" class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-full font-bold shadow-md flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-plane text-base"></i> <span>航班</span></button>
         </div>
         
         <!-- Mobile Compact Buttons Row -->
@@ -201,6 +202,7 @@
             <button onclick="openHistoryModal()" class="bg-sky-600 hover:bg-sky-700 text-white p-2 rounded-full font-bold shadow-sm flex items-center gap-0 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-folder-open text-base"></i></button>
             <button onclick="saveCurrentItinerary()" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded-full font-bold shadow-sm flex items-center gap-0 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-floppy-disk text-base"></i></button>
             <button onclick="openAIModal()" class="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white p-2 rounded-full font-bold shadow-md flex items-center gap-0 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-wand-magic-sparkles text-base"></i></button>
+            <button onclick="window.openFlightSearch()" class="bg-purple-500 hover:bg-purple-600 text-white p-2 rounded-full font-bold shadow-md flex items-center gap-0 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-plane text-base"></i></button>
         </div>
     </header>
 
@@ -222,6 +224,14 @@
         <!-- Right Panel (Map) -->
         <section id="mapPanel" class="mobile-tab-content panel-container w-full md:flex-1 bg-slate-100">
             <div id="map"></div>
+            <!-- Map Search Bar -->
+            <div class="absolute top-4 left-4 z-[400] w-80 max-w-[calc(100%-2rem)] md:w-96">
+                <div class="flex gap-2">
+                    <input type="text" id="mapSearchInput" placeholder="搜尋地點..." class="flex-1 p-3 rounded-lg border border-slate-200 shadow-md focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                    <button onclick="window.searchMapLocation()" class="bg-sky-500 hover:bg-sky-600 text-white p-3 rounded-lg shadow-md font-bold flex items-center justify-center touch-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
+                </div>
+                <div id="mapSearchResults" class="hidden absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg max-h-64 overflow-y-auto border border-slate-200 z-50"></div>
+            </div>
             <div class="absolute top-4 right-4 z-[400] flex flex-col gap-3">
                 <button onclick="map.zoomIn()" class="w-12 h-12 bg-white rounded shadow text-slate-600 hover:text-sky-600 font-bold text-2xl flex items-center justify-center">+</button>
                 <button onclick="map.zoomOut()" class="w-12 h-12 bg-white rounded shadow text-slate-600 hover:text-sky-600 font-bold text-2xl flex items-center justify-center">-</button>
@@ -431,12 +441,35 @@
             const defaultMeta = { currency: "1 TWD ≈ 4.7 JPY", weather_summary: "平均 24°C", startDate: today };
             loadItineraryFromHistory(defaultData, defaultMeta, null);
             
-            const savedKey = window.safeStorage.getItem('gemini_api_key') || envApiKey;
-            if(savedKey) {
-                document.getElementById('settingsApiKey').value = savedKey;
-                document.getElementById('keyStatusText').innerText = "已連結 AI";
-                document.querySelector('button[onclick="openSettingsModal()"] i').className = "fa-solid fa-check text-green-400";
-                document.getElementById('settingsBtn').classList.add('bg-green-500/10', 'border-green-400/30');
+            // 【優化】API Key 持久化檢查 - 延遲執行確保 DOM 準備就緒
+            setTimeout(() => {
+                const savedKey = window.safeStorage.getItem('gemini_api_key') || envApiKey;
+                if(savedKey) {
+                    window.updateAPIKeyStatus(true);
+                }
+            }, 100);
+        };
+        
+        // 【新增】更新 API Key 按鈕狀態
+        window.updateAPIKeyStatus = (isConnected) => {
+            const statusText = document.getElementById('keyStatusText');
+            const icon = document.querySelector('#settingsBtn i');
+            const btn = document.getElementById('settingsBtn');
+            
+            if(isConnected) {
+                if(statusText) statusText.innerText = "已連結 AI";
+                if(icon) icon.className = "fa-solid fa-check text-green-400";
+                if(btn) {
+                    btn.classList.add('bg-green-500/10', 'border-green-400/30');
+                    btn.classList.remove('bg-white/10', 'border-white/20');
+                }
+            } else {
+                if(statusText) statusText.innerText = "連結 AI";
+                if(icon) icon.className = "fa-solid fa-link text-base";
+                if(btn) {
+                    btn.classList.remove('bg-green-500/10', 'border-green-400/30');
+                    btn.classList.add('bg-white/10', 'border-white/20');
+                }
             }
         };
 
@@ -742,7 +775,7 @@
                    const trans = typeof stop.transport === 'string' ? stop.transport : stop.transport.desc;
                    transportHtml = `<div class="mt-2 text-xs bg-sky-50 p-1 rounded text-sky-600"><i class="fa-solid fa-train"></i> <span id="stop-trans-desc-${stop.id}" data-editable>${trans}</span></div>`;
                 }
-                card.innerHTML = `<div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 group-hover:bg-sky-500 group-hover:text-white transition-colors z-10"><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i></div>${!isLast ? '<div class="w-0.5 h-full bg-slate-100 my-1"></div>' : ''}</div><div class="flex-1 pb-2"><div class="flex justify-between items-start mb-1"><span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">${stop.time}</span><div class="flex gap-1">${(stop.tags || []).map(t => `<span class="text-[10px] text-sky-500 bg-sky-50 px-1.5 rounded">${t}</span>`).join('')}</div></div><h3 class="text-lg font-bold text-slate-800 mb-1 group-hover:text-sky-600 outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-name-${stop.id}" data-editable>${stop.name}</h3><p class="text-sm text-slate-600 leading-relaxed outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-desc-${stop.id}" data-editable>${stop.desc}</p>${transportHtml}<div class="mt-2 text-xs flex gap-2"><button onclick="window.open('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.name)}&query_place_id=${lat},${lng}', '_blank'); event.stopPropagation();" class="bg-slate-100 hover:bg-green-100 text-slate-600 hover:text-green-700 px-2 py-1 rounded transition-colors"><i class="fa-solid fa-location-arrow"></i> 導航</button></div></div></div>`;
+                                 card.innerHTML = `<div class="relative"><div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">${index > 0 ? `<button onclick="window.moveStopUp(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="上移"><i class="fa-solid fa-arrow-up"></i></button>` : ''}${index < dayData.stops.length - 1 ? `<button onclick="window.moveStopDown(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="下移"><i class="fa-solid fa-arrow-down"></i></button>` : ''}<button onclick="window.deleteStop(${day}, ${index}); event.stopPropagation();" class="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded text-xs" title="刪除"><i class="fa-solid fa-trash"></i></button></div><div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 group-hover:bg-sky-500 group-hover:text-white transition-colors z-10"><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i></div>${!isLast ? '<div class="w-0.5 h-full bg-slate-100 my-1"></div>' : ''}</div><div class="flex-1 pb-2"><div class="flex justify-between items-start mb-1"><span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">${stop.time}</span><div class="flex gap-1">${(stop.tags || []).map(t => `<span class="text-[10px] text-sky-500 bg-sky-50 px-1.5 rounded">${t}</span>`).join('')}</div></div><h3 class="text-lg font-bold text-slate-800 mb-1 group-hover:text-sky-600 outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-name-${stop.id}" data-editable>${stop.name}</h3><p class="text-sm text-slate-600 leading-relaxed outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-desc-${stop.id}" data-editable>${stop.desc}</p>${transportHtml}<div class="mt-2 text-xs flex gap-2"><button onclick="window.open('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.name)}&query_place_id=${lat},${lng}', '_blank'); event.stopPropagation();" class="bg-slate-100 hover:bg-green-100 text-slate-600 hover:text-green-700 px-2 py-1 rounded transition-colors"><i class="fa-solid fa-location-arrow"></i> 導航</button></div></div></div></div>`;
                 container.appendChild(card);
                 if (!isNaN(lat) && !isNaN(lng)) {
                     const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="marker-pin"></div><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i>`, iconSize: [30, 42], iconAnchor: [15, 42] });
@@ -773,6 +806,167 @@
             map.invalidateSize(); 
             if (map.getContainer().offsetWidth > 0) map.flyTo([lat, lng], 16, { duration: 1 });
         }
+        
+        // 【新增】地图搜索功能 - 使用 OpenStreetMap Nominatim API
+        window.searchMapLocation = async () => {
+            const searchInput = document.getElementById('mapSearchInput');
+            const query = searchInput.value.trim();
+            if (!query) {
+                window.showToast("請輸入搜尋地點");
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('mapSearchResults');
+            resultsDiv.innerHTML = '<div class="p-3 text-center text-slate-500 text-sm">搜尋中...</div>';
+            resultsDiv.classList.remove('hidden');
+            
+            try {
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8`
+                );
+                const results = await response.json();
+                
+                if (results.length === 0) {
+                    resultsDiv.innerHTML = '<div class="p-3 text-center text-slate-400 text-sm">找不到相關地點</div>';
+                    return;
+                }
+                
+                resultsDiv.innerHTML = '';
+                results.forEach((result, idx) => {
+                    const item = document.createElement('div');
+                    item.className = "p-3 border-b border-slate-100 hover:bg-sky-50 cursor-pointer transition-colors flex items-start gap-2";
+                    item.innerHTML = `
+                        <div class="flex-1 min-w-0">
+                            <div class="font-bold text-slate-800 text-sm truncate">${result.name}</div>
+                            <div class="text-xs text-slate-500 truncate">${result.address || ''}</div>
+                        </div>
+                    `;
+                    item.onclick = () => {
+                        const lat = parseFloat(result.lat);
+                        const lng = parseFloat(result.lon);
+                        focusLocation(lat, lng);
+                        resultsDiv.classList.add('hidden');
+                        showAddToItineraryPrompt(result.name, lat, lng);
+                    };
+                    resultsDiv.appendChild(item);
+                });
+            } catch (err) {
+                resultsDiv.innerHTML = '<div class="p-3 text-center text-red-500 text-sm">搜尋失敗：' + err.message + '</div>';
+                console.error('Search error:', err);
+            }
+        };
+        
+        // 【新增】顯示加入行程提示
+        window.showAddToItineraryPrompt = (placeName, lat, lng) => {
+            const container = document.getElementById('contentList');
+            
+            const promptDiv = document.createElement('div');
+            promptDiv.className = "bg-gradient-to-r from-sky-50 to-blue-50 border-2 border-sky-300 rounded-xl p-4 mb-4 sticky top-0 z-20 shadow-md";
+            promptDiv.innerHTML = `
+                <div class="flex items-center gap-3 mb-3">
+                    <i class="fa-solid fa-location-dot text-sky-600 text-xl"></i>
+                    <div class="flex-1">
+                        <div class="font-bold text-slate-800">${placeName}</div>
+                        <div class="text-xs text-slate-500">座標: ${lat.toFixed(4)}, ${lng.toFixed(4)}</div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <select id="addToDaySelect" class="flex-1 px-3 py-2 border border-sky-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-sky-500 outline-none">
+                        ${Object.keys(window.currentItineraryData).map(day => `<option value="${day}">第 ${day} 天</option>`).join('')}
+                    </select>
+                    <button onclick="window.confirmAddToItinerary('${placeName}', ${lat}, ${lng})" class="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> 加入
+                    </button>
+                    <button onclick="this.closest('.sticky').remove()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-sm transition-colors">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            if (container.firstChild) {
+                container.insertBefore(promptDiv, container.firstChild);
+            } else {
+                container.appendChild(promptDiv);
+            }
+        };
+        
+        // 【新增】確認加入行程
+        window.confirmAddToItinerary = (placeName, lat, lng) => {
+            const daySelect = document.getElementById('addToDaySelect');
+            const day = daySelect.value;
+            
+            const newStop = {
+                id: Date.now(),
+                time: "待定",
+                name: placeName,
+                lat: lat,
+                lng: lng,
+                icon: "fa-map-pin",
+                desc: "在地圖上搜尋的地點",
+                tags: ["新增"]
+            };
+            
+            if (!window.currentItineraryData[day]) {
+                window.showToast("行程不存在");
+                return;
+            }
+            
+            window.currentItineraryData[day].stops.push(newStop);
+            window.saveCurrentItinerary();
+            window.showToast("已加入行程！");
+            
+            // 刷新當前 Day 視圖並移除提示框
+            switchDay(day);
+            document.querySelector('.sticky')?.remove();
+            
+            // 清空搜尋框
+            document.getElementById('mapSearchInput').value = '';
+            document.getElementById('mapSearchResults').classList.add('hidden');
+        };
+        
+        // 【新增】回車搜尋
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('mapSearchInput');
+            if (searchInput) {
+                searchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') window.searchMapLocation();
+                });
+            }
+        });
+        
+        window.moveStopUp = (day, index) => {
+            if(index <= 0) return;
+            const stops = window.currentItineraryData[day].stops;
+            [stops[index - 1], stops[index]] = [stops[index], stops[index - 1]];
+            switchDay(day);
+            window.saveCurrentItinerary();
+            window.showToast("已上移");
+        };
+
+        // 【新增】下移景點
+        window.moveStopDown = (day, index) => {
+            const stops = window.currentItineraryData[day].stops;
+            if(index >= stops.length - 1) return;
+            [stops[index], stops[index + 1]] = [stops[index + 1], stops[index]];
+            switchDay(day);
+            window.saveCurrentItinerary();
+            window.showToast("已下移");
+        };
+
+        // 【新增】刪除景點
+        window.deleteStop = (day, index) => {
+            if(!confirm('確定要刪除這個景點嗎？')) return;
+            const stops = window.currentItineraryData[day].stops;
+            stops.splice(index, 1);
+            switchDay(day);
+            window.saveCurrentItinerary();
+            window.showToast("已刪除");
+        };
+        
+        // 【新增】打開航班查詢
+        window.openFlightSearch = () => {
+            window.open('https://flight.sabretn.com.tw/newdefault', '_blank');
+        };
 
         window.toggleMobileView = (view) => {
             const list = document.getElementById('itineraryPanel');
@@ -889,5 +1083,6 @@
     </script>
 </body>
 </html>
+
 
 
