@@ -85,7 +85,13 @@
         [contenteditable="true"]:focus { border: 1px solid #0ea5e9; background-color: white; }
         
         /* Button Touch Targets */
-        .touch-btn { min-height: 44px; min-width: 44px; }
+        .touch-btn { min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; }
+        
+        /* Mobile Touch Button Adjustments */
+        @media (max-width: 767px) {
+            .touch-btn { min-height: 48px; min-width: 48px; padding: 8px !important; }
+            header { min-height: auto; }
+        }
     </style>
 </head>
 <body>
@@ -164,23 +170,37 @@
     </script>
 
     <!-- Header -->
-    <header class="bg-sky-500 text-white p-3 shadow-lg flex justify-between items-center z-20">
-        <div class="flex items-center gap-3">
-            <div class="bg-white/20 p-2.5 rounded-full"><i class="fa-solid fa-earth-americas text-2xl"></i></div>
-            <div>
-                <h1 class="font-bold text-xl leading-tight">全球旅遊嚮導</h1>
+    <header class="bg-sky-500 text-white px-2 sm:px-3 py-2 shadow-lg flex justify-between items-center z-20 flex-wrap gap-2">
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink-0">
+            <div class="bg-white/20 p-1.5 sm:p-2.5 rounded-full flex-shrink-0"><i class="fa-solid fa-earth-americas text-xl sm:text-2xl"></i></div>
+            <div class="hidden sm:block">
+                <h1 class="font-bold text-lg sm:text-xl leading-tight">全球旅遊嚮導</h1>
                 <p class="text-xs text-sky-100 uppercase tracking-wider flex items-center gap-1">AI Planner <span id="modeBadge" class="bg-white/20 px-1.5 py-0.5 rounded text-[10px]">Cloud</span></p>
             </div>
+            <h1 class="sm:hidden font-bold text-base leading-tight">旅遊嚮導</h1>
         </div>
-        <div class="flex gap-2 items-center">
-            <button onclick="openSettingsModal()" id="settingsBtn" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full flex items-center gap-2 transition-colors border border-white/20 touch-btn" title="連結 AI">
-                <i id="settingsIcon" class="fa-solid fa-link text-lg"></i> 
-                <span id="keyStatusText" class="hidden md:inline text-sm font-bold">連結 AI</span>
+        
+        <!-- Desktop Buttons Row -->
+        <div class="hidden md:flex gap-2 items-center flex-shrink-0">
+            <button onclick="openSettingsModal()" id="settingsBtn" class="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-full flex items-center gap-2 transition-colors border border-white/20 touch-btn text-sm" title="連結 AI">
+                <i id="settingsIcon" class="fa-solid fa-link text-base"></i> 
+                <span id="keyStatusText" class="text-sm font-bold">連結 AI</span>
             </button>
-            <button onclick="openShareModal()" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-share-nodes text-lg"></i> <span class="hidden md:inline">分享</span></button>
-            <button onclick="openHistoryModal()" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-folder-open text-lg"></i> <span class="hidden md:inline">行程</span></button>
-            <button onclick="saveCurrentItinerary()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-floppy-disk text-lg"></i> <span class="hidden md:inline">儲存</span></button>
-            <button onclick="openAIModal()" class="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white px-4 py-2 rounded-full font-bold shadow-md flex items-center gap-2 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-wand-magic-sparkles text-lg"></i> <span class="hidden md:inline">規劃</span></button>
+            <button onclick="openShareModal()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-share-nodes text-base"></i> <span>分享</span></button>
+            <button onclick="openHistoryModal()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-folder-open text-base"></i> <span>行程</span></button>
+            <button onclick="saveCurrentItinerary()" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-floppy-disk text-base"></i> <span>儲存</span></button>
+            <button onclick="openAIModal()" class="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white px-3 py-2 rounded-full font-bold shadow-md flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-wand-magic-sparkles text-base"></i> <span>規劃</span></button>
+        </div>
+        
+        <!-- Mobile Compact Buttons Row -->
+        <div class="md:hidden flex gap-1.5 items-center justify-end flex-wrap w-full">
+            <button onclick="openSettingsModal()" id="settingsBtn" class="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full flex items-center gap-0 transition-colors border border-white/20 touch-btn" title="連結 AI">
+                <i id="settingsIcon" class="fa-solid fa-link text-base"></i> 
+            </button>
+            <button onclick="openShareModal()" class="bg-sky-600 hover:bg-sky-700 text-white p-2 rounded-full font-bold shadow-sm flex items-center gap-0 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-share-nodes text-base"></i></button>
+            <button onclick="openHistoryModal()" class="bg-sky-600 hover:bg-sky-700 text-white p-2 rounded-full font-bold shadow-sm flex items-center gap-0 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-folder-open text-base"></i></button>
+            <button onclick="saveCurrentItinerary()" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded-full font-bold shadow-sm flex items-center gap-0 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-floppy-disk text-base"></i></button>
+            <button onclick="openAIModal()" class="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white p-2 rounded-full font-bold shadow-md flex items-center gap-0 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-wand-magic-sparkles text-base"></i></button>
         </div>
     </header>
 
@@ -869,5 +889,5 @@
     </script>
 </body>
 </html>
-</html>
+
 
