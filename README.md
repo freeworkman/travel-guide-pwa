@@ -1,28 +1,32 @@
-# 🌍 全球旅遊嚮導 - AI 行程規劃應用 V1.0.1
+# 🌍 全球旅遊嚮導 - AI 行程規劃應用
 
-![GitHub stars](https://img.shields.io/badge/version-1.0.0-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Platform](https://img.shields.io/badge/platform-PWA%20%7C%20iOS%20%7C%20Android-brightgreen)
+![版本](https://img.shields.io/badge/版本-2.1.0-blue)
+![授權](https://img.shields.io/badge/授權-MIT-green)
+![平台](https://img.shields.io/badge/平台-PWA%20%7C%20iOS%20%7C%20Android-brightgreen)
+![更新日期](https://img.shields.io/badge/更新-2025年12月-orange)
 
 一個功能完整的 **AI 驅動旅遊行程規劃應用**，支援 PWA、iOS 和 Android。
 
 ## ✨ 核心功能
 
 ### 🤖 AI 行程規劃
-- 使用 Google Gemini API 自動生成旅遊行程
+- 使用 Google Gemini API 自動產生旅遊行程
 - 支援多天行程規劃
 - 智慧景點推薦
 
 ### 🗺️ 互動地圖
 - 高精度 Leaflet 地圖整合
-- 實時景點標記和路線規劃
+- 即時景點標記和路線規劃
 - 一鍵導航功能
+- 搜尋地點後直接加入行程
 
-### 📊 智能工具
+### 📊 智慧工具
 - ✅ 即時天氣查詢
 - ✅ 匯率動態轉換
 - ✅ 行程編輯和保存
 - ✅ 雲端備份（Firebase）
+- ✅ 行程景點上下移動和刪除
+- ✅ 地圖景點直接加入行程
 
 ### 📱 跨平台支援
 - ✅ **iOS PWA** - Safari 打開即可安裝
@@ -30,7 +34,7 @@
 - ✅ **離線模式** - Service Worker 快取
 - ✅ **自動更新** - 背景同步
 
-### 💾 數據管理
+### 💾 資料管理
 - 本地儲存行程
 - Firebase 雲端備份
 - 行程分享和匯入
@@ -45,7 +49,7 @@
 #### iOS 用戶
 1. 用 **Safari** 打開：
    ```
-   https://heartfelt-crumble-323cc4.netlify.app/index.html
+   https://heartfelt-crumble-323cc4.netlify.app/全球旅遊嚮導V1_1.html
    ```
 2. 點「分享」→「加入主屏幕」
 3. 完成！App 已安裝 ✨
@@ -53,7 +57,7 @@
 #### Android 用戶
 1. 用 **Chrome/Edge** 打開：
    ```
-   https://heartfelt-crumble-323cc4.netlify.app/index.html
+   https://heartfelt-crumble-323cc4.netlify.app/全球旅遊嚮導V1_1.html
    ```
 2. 點右上角「安裝」按鈕
 3. 完成！App 已安裝 ✨
@@ -61,7 +65,7 @@
 #### 電腦用戶
 直接訪問：
 ```
-https://heartfelt-crumble-323cc4.netlify.app/index.html
+https://heartfelt-crumble-323cc4.netlify.app/全球旅遊嚮導V1_1.html
 ```
 
 ---
@@ -70,12 +74,14 @@ https://heartfelt-crumble-323cc4.netlify.app/index.html
 
 ```
 travel_plan/
-├── 全球旅遊嚮導V1_1.html      # 主應用（包含所有 HTML/CSS/JS）
-├── manifest.json               # PWA 設定檔
-├── sw.js                       # Service Worker（離線支援）
-├── _redirects                  # Netlify 路由設定
-├── README.md                   # 本說明文件
-└── 各種教程.md                  # 部署和使用指南
+├── Index.html                      # 主應用（包含所有 HTML/CSS/JS）
+├── manifest.json                   # PWA 設定檔
+├── sw.js                          # Service Worker（離線支援）
+├── _redirects                     # Netlify 路由設定
+├── README.md                      # 本說明文件
+├── package.json                   # Node.js 套件設定
+├── .env.example                   # 環境變數範本
+└── 各種教程.md                    # 部署和使用指南
 ```
 
 ---
@@ -84,7 +90,7 @@ travel_plan/
 
 ### 1️⃣ AI 行程規劃
 ```
-設定 Google Gemini API Key → 輸入旅遊偏好 → AI 自動生成行程
+設定 Google Gemini API Key → 輸入旅遊偏好 → AI 自動產生行程
 ```
 
 **支援功能：**
@@ -97,14 +103,23 @@ travel_plan/
 - 點擊景點直接導航
 - 查看完整路線規劃
 - 放大/縮小地圖
-- 自動調整符合手機螢幕大小
+- 自適應手機螢幕
+- **搜尋地點後加入行程**
+- **在地圖上點選地點後加入行程**
 
-### 3️⃣ 數據持久化
+### 3️⃣ 行程管理
+- **景點上下移動**：滑鼠移到景點卡片時出現控制按鈕
+- **刪除景點**：點擊刪除按鈕立即移除
+- **自動保存**：所有變更自動儲存到本地
+- **直接切換日期**：在總表行程中點選地點後直接切換到該日的行程地點
+
+### 4️⃣ 資料持久化
 - **本地儲存**：LocalStorage + Service Worker
-- **雲端備份**：Firebase Firestore（可選）
-- **離線支援**：首次使用緩存資源
+- **雲端備份**：Firebase Firestore（選用）
+- **離線支援**：首次訪問快取資源
+- **API Key 記憶**：首次貼入後自動保存，無需重複輸入
 
-### 4️⃣ 分享功能
+### 5️⃣ 分享功能
 - 📤 複製行程資料碼分享給朋友
 - 📱 LINE 直接分享
 - 💾 Email 備份
@@ -193,12 +208,12 @@ Live PWA
 
 ---
 
-## 📲 PWA 優勢
+## 📱 PWA 優勢
 
-| 功能 | PWA | Web | Native App |
+| 功能 | PWA | 網站 | 原生應用 |
 |------|-----|-----|-----------|
-| 安裝到主屏幕 | ✅ | ❌ | ✅ |
-| 全屏顯示 | ✅ | ❌ | ✅ |
+| 安裝到主螢幕 | ✅ | ❌ | ✅ |
+| 全螢幕顯示 | ✅ | ❌ | ✅ |
 | 離線使用 | ✅ | ❌ | ✅ |
 | 一鍵部署 | ✅ | ✅ | ❌ |
 | 自動更新 | ✅ | ✅ | ❌ |
@@ -213,7 +228,7 @@ Live PWA
 | **iOS** | Safari | ✅✅✅ 完美 |
 | **Android** | Chrome | ✅✅✅ 完美 |
 | **Android** | Edge | ✅✅✅ 完美 |
-| **Desktop** | Chrome/Edge/Firefox | ✅✅✅ 完美 |
+| **桌面** | Chrome/Edge/Firefox | ✅✅✅ 完美 |
 
 ---
 
@@ -234,6 +249,7 @@ Live PWA
 ```
 選擇 Day → 地圖自動顯示路線
 點擊景點 → 地圖自動導航到該位置
+點「搜尋地點」→ 搜尋後加入行程
 ```
 
 ### 🌡️ 查看天氣
@@ -244,6 +260,12 @@ Live PWA
 ### 💱 匯率轉換
 ```
 點匯率 → 自動切換反向匯率
+```
+
+### 🎮 編排行程
+```
+滑鼠移到景點卡片 → 出現上移/下移/刪除按鈕
+點擊按鈕 → 立即執行，自動保存
 ```
 
 ---
@@ -258,16 +280,30 @@ Live PWA
 ### 🟡 Apache Cordova（計畫中）
 - 🔄 上架 App Store（需 $99/年）
 - 🔄 上架 Google Play（需 $25）
-- 🔄 原生性能最佳化
+- 🔄 原生性能優化
 
 ### 🔴 Flutter（計畫中）
 - 🔄 最佳性能
 - 🔄 官方維護支持
-- 🔄 豐富 UI 模組
+- 🔄 豐富 UI 組件
 
 ---
 
 ## 📝 更新日誌
+
+### v2.1.0 (2025-12-03) ⭐ 最新版本
+- ✅ 行程景點上下移動和刪除功能
+- ✅ 地圖搜尋地點後加入行程
+- ✅ 總表行程直接切換到該日的行程地點
+- ✅ 行程與地圖的手機版 UI 優化
+- ✅ API Key 首次輸入後自動記憶
+- ✅ 手機版按鈕尺寸最佳化
+
+### v2.0.0 (2025-12-02)
+- ✅ 地圖搜尋功能整合
+- ✅ 行程編輯功能優化
+- ✅ 移動設備友善版面
+- ✅ Header 和導航欄改進
 
 ### v1.0.0 (2024-12-02)
 - ✅ 初始版本發佈
@@ -301,7 +337,7 @@ Live PWA
 
 發現問題？請提交 Issue：
 - 描述問題
-- 提供截圖/影片
+- 提供截圖/視頻
 - 說明重現步驟
 
 ---
@@ -336,7 +372,7 @@ Live PWA
 ## 📞 聯繫方式
 
 - 💬 提交 Issue
-- 📧 Email：YH.shieh@geminiai.site
+- 📧 Email：your@email.com
 - 🐦 Twitter：@yourhandle
 
 ---
@@ -347,14 +383,14 @@ Live PWA
 
 ```
 🌍 分享給朋友：
-https://heartfelt-crumble-323cc4.netlify.app/index.html
+https://heartfelt-crumble-323cc4.netlify.app/全球旅遊嚮導V1_1.html
 ```
 
 ---
 
 ## 📊 統計
 
-- ⏱️ **開發時間**: ~20 小時
+- ⏱️ **開發時間**: ~100 小時
 - 🎨 **UI 組件**: 20+
 - 📍 **地點支援**: 無限
 - 🌍 **支援語言**: 繁體中文
@@ -369,5 +405,3 @@ https://heartfelt-crumble-323cc4.netlify.app/index.html
 [⬆ 回到頂部](#-全球旅遊嚮導---ai-行程規劃應用)
 
 </div>
-
-
