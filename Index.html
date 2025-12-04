@@ -15,6 +15,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- LZString 壓縮庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
     
     <style>
         /* --- iOS Critical Fixes --- */
@@ -420,6 +422,46 @@
         let map, markers = {}, currentPolyline = null, currentBounds = null, currentDay = 1;
         let isEditMode = false;
         let weatherCache = {}; // 快取天氣資料
+        
+        // 【新增】城市/地點到國家的對應表 - 用於偵測行程目的地
+        const locationToCountry = {
+            '京都': 'Japan', '東京': 'Japan', 'tokyo': 'Japan', 'kyoto': 'Japan',
+            '大阪': 'Japan', '奈良': 'Japan', '札幌': 'Japan', '福岡': 'Japan',
+            '清水寺': 'Japan', '伏見稻荷': 'Japan', '嵐山': 'Japan',
+            '台北': 'Taiwan', '台湾': 'Taiwan', '台灣': 'Taiwan', 'taipei': 'Taiwan',
+            '高雄': 'Taiwan', '台中': 'Taiwan', '墾丁': 'Taiwan', '日月潭': 'Taiwan',
+            '曼谷': 'Thailand', 'bangkok': 'Thailand', '清邁': 'Thailand', '普吉島': 'Thailand',
+            '首爾': 'South Korea', 'seoul': 'South Korea', '釜山': 'South Korea', '仁川': 'South Korea',
+            '新加坡': 'Singapore', 'singapore': 'Singapore',
+            '紐約': 'USA', '洛杉磯': 'USA', '舊金山': 'USA', '芝加哥': 'USA',
+            'new york': 'USA', 'los angeles': 'USA', 'san francisco': 'USA',
+            '巴黎': 'France', 'paris': 'France', '馬賽': 'France',
+            '柏林': 'Germany', 'berlin': 'Germany', '慕尼黑': 'Germany',
+            '蘇黎世': 'Switzerland', 'zurich': 'Switzerland', '日內瓦': 'Switzerland', 'geneva': 'Switzerland',
+            '馬德里': 'Spain', 'madrid': 'Spain', '巴塞隆納': 'Spain',
+            '羅馬': 'Italy', 'rome': 'Italy', '威尼斯': 'Italy', '佛羅倫斯': 'Italy',
+            '雪梨': 'Australia', 'sydney': 'Australia', '墨爾本': 'Australia', '布里斯班': 'Australia',
+            '奧克蘭': 'New Zealand', 'auckland': 'New Zealand', '威靈頓': 'New Zealand', 'wellington': 'New Zealand',
+            '皇后鎮': 'New Zealand', 'queenstown': 'New Zealand', '羅托魯瓦': 'New Zealand'
+        };
+        
+        // 【新增】國家旅遊資訊資料庫
+        const countryTipsDatabase = {
+            'Japan': { name: '日本', safety: '非常安全，犯罪率極低。深夜外出也相對安全。建議避開偏遠山區。', customs: '非常重視禮儀和秩序。在公共場合保持安靜，不要在火車上打電話。廟宇參拜時脫鞋。脫鞋時要整齊排放。', entry: '台灣護照可享 90 天免簽。入境時填寫入境卡。機場提供 WiFi 和 SIM 卡。準備好食物過敏信息的日語卡片。', tax: '消費稅 10%（某些商品 8%）。遊客在百貨公司消費超 5,000 日圓可辦理退稅。退稅需要護照。', tips: '【交通】JR Pass 超划算，含新幹線。【飲食】現金為主，部分店家不收卡。【溫泉】下水前需沖洗身體。【住宿】Check-in 通常 15:00，Check-out 11:00。【購物】藥妝店和百貨公司多。【語言】英文在大城市可通，鄉村地區建議下載翻譯 App。' },
+            'Taiwan': { name: '台灣', safety: '非常安全，位居亞洲最安全國家。治安良好，警察友善。', customs: '民間信仰與廟宇文化濃厚。尊重長者，問候時雙手合十。台灣人熱情好客。', entry: '無需簽證。機場提供便利的交通接駁。', tax: '消費稅已包含在標價中。無退稅制度。', tips: '【交通】高鐵和台鐵便宜且準時。機車租賃便宜。【飲食】夜市小吃便宜美味，必吃珍珠奶茶。【溫泉】北投和宜蘭溫泉著名。【購物】免稅商品在機場。【語言】中文和台語通行。' },
+            'Thailand': { name: '泰國', safety: '大城市相對安全，但要避免偏遠地區和北部邊界。小心扒手和詐騙。', customs: '尊敬國王是最重要的禮儀。不可踩踏國王肖像。進入廟宇要脫鞋並穿著得體。',entry: '台灣護照可享 30-60 天免簽。需要回程機票證明。建議辦理旅遊保險。', tax: '消費稅 7%。外國遊客部分商店可退稅（需消費達要求額度）。', tips: '【交通】嘟嘟車廉價但要議價。BTS 天鐵方便快速。【飲食】辛辣食物居多，告知廚師辣度偏好。飲用清潔水。【文化】3 月-5 月是熱季，容易中暑。【購物】濱河夜市和商場眾多。【語言】英文在觀光區通用。' },
+            'South Korea': { name: '韓國', safety: '非常安全，犯罪率低。晚上外出相對安心。首爾地鐵四通八達。', customs: '尊重年長者，問候時鞠躬。不可在長者面前抽菸或喝酒。',entry: '台灣護照可享 90 天免簽。需展示回程機票。仁川機場提供便利的交通。', tax: '消費稅 10%。外國遊客購物滿額可退稅。退稅需在機場辦理。', tips: '【交通】地鐵便宜且英文標誌清晰。T-money 卡通用於大眾交通。【飲食】燒烤和火鍋人氣高。紅參糖參滋補。【文化】K-pop 文化盛行。【購物】明洞和東大門是購物天堂。【語言】年輕人英文不錯，老年人困難。' },
+            'Singapore': { name: '新加坡', safety: '亞洲最安全城市之一。法律嚴格，執行力強。街道乾淨安全。', customs: '多元文化共存。尊重他人宗教信仰。公共場合安靜。不可隨地吐痰或亂丟垃圾。',entry: '台灣護照可享 30 天免簽。需要回程機票。', tax: '消費稅 9% GST。非居民購物達 100 新幣以上可退稅。', tips: '【交通】MRT 地鐵網路發達，儲值卡便利。出租車貴但安全。【飲食】多國菜系，適合各種口味。【文化】華人為主，普通話通行。【購物】樟宜機場免稅店選擇多。【語言】英文普遍通用。' },
+            'USA': { name: '美國', safety: '大城市治安參差不齊，需謹慎選擇地區。晚上避免獨自外出。使用 Uber 較安全。', customs: '禮儀相對輕鬆。握手是常見問候。小費文化強（通常 15-20%）。',entry: '台灣護照需要 ESTA 或簽證。準備財力證明和行程計畫。', tax: '消費稅各州不同（0-10%）。退稅政策依州而異。', tips: '【交通】自駕為主，大城市有公共交通。Uber 和 Lyft 便利。【飲食】份量大，建議與人共享。【文化】多元社會，尊重不同背景。【購物】名牌折扣店常見。【語言】英文為主，口音多樣。' },
+            'France': { name: '法國', safety: '大城市相對安全，但注意扒手。避免夜間獨自外出。展示警惕意識。', customs: '禮儀講究。見面通常親吻臉頰。不要以「Bonjour」結束談話。尊重法國文化和語言。',entry: '台灣護照在申根區可停留 90 天。需要簽證申請。',tax: '消費稅 20%。非歐盟居民購物達 100 歐元可退稅。', tips: '【交通】火車網路便利，高鐵快速。地鐵在大城市發達。【飲食】品味餐廳文化，不要催促用餐。水要另付費。【文化】咖啡館是社交中心。【購物】香榭麗舍大街是購物天堂。【語言】法文普遍，英文較少。' },
+            'Germany': { name: '德國', safety: '相對安全，但大城市需小心扒手。公共交通準時可靠。', customs: '準時和效率是核心價值。握手時眼神接觸很重要。不要浪費食物。',entry: '台灣護照在申根區可停留 90 天。需簽證。', tax: '消費稅 19%。非歐盟居民消費達 50 歐元可退稅。', tips: '【交通】火車準時，DB 票卡便利。自行車文化流行。【飲食】豬腳和啤酒特色。咖啡館文化發達。【文化】聖誕市集季必訪。【購物】商場和百貨眾多。【語言】年輕人英文不錯。' },
+            'Spain': { name: '西班牙', safety: '觀光區相對安全，但大城市需防扒手。避免深夜獨自外出。', customs: '熱情開放。晚餐時間較遲（20:00 後）。Siesta 習俗仍存。',entry: '台灣護照在申根區停留 90 天。需簽證。', tax: '消費稅 21%。非歐盟居民購物達 90.16 歐元可退稅。', tips: '【交通】地鐵便利，高鐵舒適。巴士便宜。【飲食】海鮮飯和火腿著名。晚餐很晚。【文化】弗拉門戈舞和鬥牛文化。【購物】超市和設計品牌多。【語言】英文在觀光區可用。' },
+            'Italy': { name: '意大利', safety: '觀光區安全，但大城市需警覺扒手。夜間避免獨自外出。', customs: '家庭和朋友關係重要。肢體語言豐富。不要匆促進行。',entry: '台灣護照在申根區停留 90 天。需簽證。', tax: '消費稅 22%。非歐盟居民購物達 155 歐元可退稅。', tips: '【交通】火車方便，地鐵在大城市發達。公車便宜。【飲食】pasta 和披薩多樣。咖啡後才喝牛奶飲品。【文化】藝術和歷史豐富。【購物】設計品牌和古董店。【語言】英文在大城市可用。' },
+            'Australia': { name: '澳大利亞', safety: '相對安全，但需注意野生動物。晚間外出謹慎。', customs: '友善和放鬆。戶外文化強。尊重原住民。',entry: '台灣護照需要電子簽證或簽證。準備足夠資金證明。', tax: '消費稅 10%。非澳大利亞居民購物達 $300 AUD 可退稅。', tips: '【交通】城市公共交通便利。自駕需注意左駕規則。【飲食】咖啡文化發達。BBQ 常見。【文化】海灘文化和戶外運動。【購物】免稅商品在機場。【語言】英文為主，口音獨特。' },
+            'Switzerland': { name: '瑞士', safety: '非常安全，犯罪率極低。是世界上最安全的國家之一。', customs: '尊重隱私，避免大聲喧譁。遵守時間。尊重自然環境。', entry: '台灣護照在申根區可停留 90 天。需要簽證申請。建議購買旅遊保險。', tax: '瑞士無增值稅退稅制度（已包含在價格中）。購物價格全球最高。', tips: '【交通】火車系統發達且準時。購買瑞士通票優惠多。【飲食】奶酪和巧克力著名。飲食昂貴，建議自備食物。【文化】登山和滑雪活動豐富。【購物】手錶和奶酪是必購品。【語言】四種官方語言，英文在觀光區通用。' },
+            'New Zealand': { name: '紐西蘭', safety: '非常安全，犯罪率低。是世界上最安全的旅遊目的地之一。', customs: '友善開放。毛利文化受尊重。戶外運動精神強。', entry: '台灣護照可享 6 個月免簽。需展示回程機票和足夠資金。', tax: '消費稅 15% GST。非紐西蘭居民消費達 $400 NZD 可於機場退稅。', tips: '【交通】景點間距離遠，建議租車自駕。左駕規則。公共交通有限。【飲食】新鮮羊肉和海鮮。咖啡文化發達。【戶外】極限運動首選（跳傘、蹦極）。【文化】毛利文化體驗。【購物】羊毛製品和蜂蜜著名。【語言】英文普遍通用。' }
+        };
+        
         function escapeStr(str) { return str ? str.replace(/'/g, "\\'").replace(/"/g, '&quot;') : ''; }
         async function copyToClipboard(text) {
             try { await navigator.clipboard.writeText(text); return true; } catch (err) {
@@ -654,18 +696,30 @@
         window.shareAsCode = async () => {
             if (!window.currentItineraryData) return alert("無行程可分享");
             const jsonStr = JSON.stringify({ data: window.currentItineraryData, meta: window.currentMetaData });
-            const code = btoa(unescape(encodeURIComponent(jsonStr)));
-            const success = await window.copyToClipboard(code);
-            if (success) { alert("行程資料碼已複製！\n請將此代碼貼給您的朋友，他們即可使用「匯入」功能讀取行程。"); window.closeModal('shareModal'); } else { alert("複製失敗，請手動複製"); }
+            // 使用 LZ 字符串壓縮以減少代碼長度
+            const compressed = LZString.compressToBase64(jsonStr);
+            const success = await window.copyToClipboard(compressed);
+            if (success) { alert("行程資料碼已複製！\n\n壓縮後長度：" + compressed.length + " 字符\n\n原始長度：" + jsonStr.length + " 字符\n壓縮率：" + (100 - Math.round(compressed.length / jsonStr.length * 100)) + "%\n\n請將此代碼貼給您的朋友，他們即可使用「匯入」功能讀取行程。"); window.closeModal('shareModal'); } else { alert("複製失敗，請手動複製"); }
         };
+        
         window.importItinerary = () => {
-             const code = prompt("請貼上朋友分享的「行程資料碼」：");
-             if (!code) return;
-             try {
-                 const jsonStr = decodeURIComponent(escape(atob(code)));
-                 const shared = JSON.parse(jsonStr);
-                 if (shared && shared.data) { window.loadItineraryFromHistory(shared.data, shared.meta, null); window.saveCurrentItinerary(); window.closeModal('historyModal'); alert("行程匯入成功！"); } else { alert("無效的行程碼格式"); }
-             } catch (e) { console.error(e); alert("匯入失敗：代碼錯誤"); }
+            const code = prompt("請貼上朋友分享的「行程資料碼」：");
+            if (!code) return;
+            try {
+                // 嘗試解壓 LZ 字符串格式
+                let jsonStr = '';
+                try {
+                    jsonStr = LZString.decompressFromBase64(code);
+                } catch (e) {
+                    // 回退到舊格式（純 Base64）
+                    jsonStr = decodeURIComponent(escape(atob(code)));
+                }
+                
+                if (!jsonStr) throw new Error("解壓失敗");
+                
+                const shared = JSON.parse(jsonStr);
+                if (shared && shared.data) { window.loadItineraryFromHistory(shared.data, shared.meta, null); window.saveCurrentItinerary(); window.closeModal('historyModal'); alert("行程匯入成功！"); } else { alert("無效的行程碼格式"); }
+            } catch (e) { console.error(e); alert("匯入失敗：代碼錯誤或格式不支援。\n\n錯誤：" + e.message); }
         };
         window.shareToLine = () => {
             const data = window.currentItineraryData; const meta = window.currentMetaData; if (!data) return;
@@ -916,11 +970,399 @@
             if(isEditMode) updateEditUI();
         }
 
-        function renderTips() {
+        async function renderTips() {
             const container = document.getElementById('contentList');
-            container.innerHTML = `<div class="p-4"><h3 class="font-bold text-lg mb-2">💡 貼心提示</h3><p class="text-slate-600">這裡會顯示該國家的通用建議。</p></div>`;
+            container.innerHTML = '<div class="p-4 text-center"><div class="loader mx-auto mb-3"></div><p class="text-slate-500">分析行程中...</p></div>';
+            
+            if (!window.currentItineraryData) {
+                container.innerHTML = `<div class="p-4 text-center text-slate-500"><h3 class="font-bold text-lg mb-2">💡 貼心提示</h3><p>請先選擇或建立行程</p></div>`;
+                return;
+            }
+            
+            // 偵測國家 - 優先使用 AI 分析行程內容
+            let detectedCountries = [];
+            const apiKey = window.safeStorage.getItem('gemini_api_key');
+            
+            // 如果有 API Key，用 AI 分析行程中會訪問哪些國家
+            if (apiKey) {
+                detectedCountries = await detectCountriesWithAI(apiKey);
+            }
+            
+            // 如果 AI 未能偵測，回退到靜態方式
+            if (detectedCountries.length === 0) {
+                detectedCountries = detectCountriesStatically();
+            }
+            
+            // 根據偵測到的國家生成 Tips
+            if (detectedCountries.length > 0) {
+                await renderMultiCountryTips(detectedCountries, apiKey);
+                return;
+            } else {
+                container.innerHTML = `
+                    <div class="p-4">
+                        <div class="flex items-center gap-2 mb-4">
+                            <h2 class="text-2xl font-bold text-sky-900">💡 旅遊貼心提示</h2>
+                        </div>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                            <p class="text-slate-600 mb-4">未檢測到具體國家。請選擇已支援的國家：</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                ${Object.keys(countryTipsDatabase).map(country => 
+                                    `<button onclick="alert('${countryTipsDatabase[country].name} - ${countryTipsDatabase[country].safety.substring(0, 20)}...')" 
+                                     class="px-2 py-2 bg-sky-100 hover:bg-sky-200 rounded text-sm font-medium text-sky-800 transition">
+                                        ${countryTipsDatabase[country].name}
+                                     </button>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    </div>`;
+            }
         }
+        
+        // 【新增】使用 AI 分析行程中會訪問的國家（支持所有國家）
+        async function detectCountriesWithAI(apiKey) {
+            try {
+                const itineraryText = JSON.stringify(window.currentItineraryData, null, 2).substring(0, 2000);
+                
+                const prompt = `分析以下旅遊行程，識別出所有會訪問的國家和地區。
 
+行程內容：
+${itineraryText}
+
+請以 JSON 格式返回，包含國家名稱和英文代碼，格式如下：
+[
+  {"name": "日本", "code": "Japan"},
+  {"name": "美國", "code": "USA"},
+  {"name": "法國", "code": "France"}
+]
+
+規則：
+- 使用標準英文國家代碼（如 Japan, Switzerland, New Zealand）
+- 如果是多天歐洲行程或多國行程，請列出所有會訪問的國家
+- 如果行程中提到特定城市，根據城市推斷國家
+- 不論國家是否在預定義清單中，都要返回
+
+只返回 JSON 陣列，不需要其他文字。`;
+
+                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: prompt }]
+                        }],
+                        generationConfig: {
+                            temperature: 0.3,
+                            maxOutputTokens: 300
+                        }
+                    })
+                });
+                
+                if (!response.ok) return [];
+                
+                const data = await response.json();
+                if (!data.candidates || !data.candidates[0].content.parts[0].text) return [];
+                
+                const responseText = data.candidates[0].content.parts[0].text;
+                const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+                if (!jsonMatch) return [];
+                
+                const countries = JSON.parse(jsonMatch[0]);
+                return Array.isArray(countries) ? countries : [];
+            } catch (error) {
+                console.error('AI 國家偵測失敗:', error);
+                return [];
+            }
+        }
+        
+        // 【改進】靜態方式偵測國家（支持動態國家）
+        function detectCountriesStatically() {
+            const detectedCountries = new Set();
+            let allText = JSON.stringify({
+                data: window.currentItineraryData,
+                meta: window.currentMetaData || {}
+            }).toLowerCase();
+            
+            // 首先嘗試使用 locationToCountry 對應表
+            for (let location in locationToCountry) {
+                if (allText.includes(location.toLowerCase())) {
+                    detectedCountries.add(locationToCountry[location]);
+                }
+            }
+            
+            // 檢查國家名稱（來自數據庫）
+            for (let country in countryTipsDatabase) {
+                const countryName = countryTipsDatabase[country].name.toLowerCase();
+                if (allText.includes(countryName) || allText.includes(country.toLowerCase())) {
+                    detectedCountries.add(country);
+                }
+            }
+            
+            // 如果沒有偵測到任何國家，顯示提示
+            if (detectedCountries.size === 0) {
+                return [];
+            }
+            
+            return Array.from(detectedCountries);
+        }
+        
+        // 【改進】渲染多個國家的 Tips（支持動態國家）
+        async function renderMultiCountryTips(countries, apiKey) {
+            const container = document.getElementById('contentList');
+            let html = `<div class="p-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <h2 class="text-2xl font-bold text-sky-900">💡 旅遊貼心提示</h2>
+                    ${apiKey ? '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">AI 驅動</span>' : '<span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">數據庫</span>'}
+                </div>`;
+            
+            // 提取國家名稱用於展示
+            const countryNames = countries.map(c => {
+                if (typeof c === 'object' && c.name) return c.name;
+                return countryTipsDatabase[c]?.name || c;
+            }).join(', ');
+            
+            html += `<p class="text-sm text-slate-500 mb-4">目的地: ${countryNames}</p>
+                <div class="space-y-4">`;
+            
+            for (let countryObj of countries) {
+                let countryCode = typeof countryObj === 'object' ? countryObj.code : countryObj;
+                let countryName = typeof countryObj === 'object' ? countryObj.name : (countryTipsDatabase[countryCode]?.name || countryCode);
+                
+                let tips;
+                
+                // 首先檢查是否在數據庫中
+                if (countryTipsDatabase[countryCode]) {
+                    // 嘗試用 AI 增強數據庫中的 Tips
+                    if (apiKey) {
+                        tips = await generateTipsWithGemini(countryCode, apiKey);
+                    }
+                    
+                    // 如果 AI 失敗，使用數據庫
+                    if (!tips) {
+                        const staticTips = countryTipsDatabase[countryCode];
+                        tips = {
+                            country: staticTips.name,
+                            safety: staticTips.safety,
+                            customs: staticTips.customs,
+                            entry: staticTips.entry,
+                            tax: staticTips.tax,
+                            tips: staticTips.tips,
+                            source: 'database'
+                        };
+                    }
+                } else {
+                    // 不在數據庫中，用 AI 生成 Tips
+                    if (apiKey) {
+                        tips = await generateDynamicCountryTips(countryName, countryCode, apiKey);
+                    } else {
+                        // 無 API Key，顯示基本信息
+                        tips = {
+                            country: countryName,
+                            safety: '暫無信息',
+                            customs: '暫無信息',
+                            entry: '暫無信息',
+                            tax: '暫無信息',
+                            tips: '需連結 Google AI 以獲取詳細資訊',
+                            source: 'limited'
+                        };
+                    }
+                }
+                
+                html += generateTipsHtml(tips);
+            }
+            
+            html += '</div></div>';
+            container.innerHTML = html;
+        }
+        
+        // 【新增】為動態國家生成 Tips（不在內建數據庫中的國家）
+        async function generateDynamicCountryTips(countryName, countryCode, apiKey) {
+            try {
+                const prompt = `你是一位世界旅遊專家。為即將訪問 ${countryName} 的台灣遊客提供詳細的旅遊建議。
+
+請以 JSON 格式提供以下信息（務必是有效的 JSON 格式）:
+{
+  "safety": "該國的治安狀況和安全建議（100字以內）",
+  "customs": "風土民情和禮儀注意事項（100字以內）",
+  "entry": "出入境須知和簽證要求（100字以內）",
+  "tax": "稅率、購物退稅政策（100字以內）",
+  "tips": "旅遊小貼士，包括交通、飲食、購物、住宿等（200字以內）"
+}
+
+回覆時只需提供 JSON 對象，不需要其他文字。`;
+
+                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: prompt }]
+                        }],
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 800
+                        }
+                    })
+                });
+                
+                if (!response.ok) return null;
+                
+                const data = await response.json();
+                if (!data.candidates || !data.candidates[0].content.parts[0].text) return null;
+                
+                const responseText = data.candidates[0].content.parts[0].text;
+                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) return null;
+                
+                const tips = JSON.parse(jsonMatch[0]);
+                return {
+                    country: countryName,
+                    ...tips,
+                    source: 'ai-dynamic'
+                };
+            } catch (error) {
+                console.error('動態國家 Tips 生成失敗:', error);
+                return null;
+            }
+        }
+        
+        // 【改進】生成單個國家 Tips 的 HTML（支持多種來源標記）
+        function generateTipsHtml(tips) {
+            // 決定來源標記
+            let sourceBadge = '';
+            if (tips.source === 'ai-dynamic') {
+                sourceBadge = '<span class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded ml-2">✨ AI 生成</span>';
+            } else if (tips.source === 'gemini') {
+                sourceBadge = '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded ml-2">🤖 AI 增強</span>';
+            } else if (tips.source === 'database') {
+                sourceBadge = '<span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded ml-2">📚 數據庫</span>';
+            } else if (tips.source === 'limited') {
+                sourceBadge = '<span class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded ml-2">⚠️ 有限信息</span>';
+            }
+            
+            return `
+                <div class="border border-slate-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-bold text-sky-900">${tips.country}</h3>
+                        ${sourceBadge}
+                    </div>
+                    
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                        <div class="flex items-start gap-2">
+                            <i class="fa-solid fa-shield-halved text-amber-600 text-lg mt-0.5 flex-shrink-0"></i>
+                            <div class="flex-1 text-sm">
+                                <h4 class="font-bold text-amber-900 mb-1">🛡️ 治安狀況</h4>
+                                <p class="text-amber-800">${tips.safety || '暫無信息'}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                        <div class="flex items-start gap-2">
+                            <i class="fa-solid fa-handshake text-blue-600 text-lg mt-0.5 flex-shrink-0"></i>
+                            <div class="flex-1 text-sm">
+                                <h4 class="font-bold text-blue-900 mb-1">🤝 風土民情</h4>
+                                <p class="text-blue-800">${tips.customs || '暫無信息'}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                        <div class="flex items-start gap-2">
+                            <i class="fa-solid fa-passport text-green-600 text-lg mt-0.5 flex-shrink-0"></i>
+                            <div class="flex-1 text-sm">
+                                <h4 class="font-bold text-green-900 mb-1">🛂 出入境須知</h4>
+                                <p class="text-green-800">${tips.entry || '暫無信息'}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
+                        <div class="flex items-start gap-2">
+                            <i class="fa-solid fa-receipt text-purple-600 text-lg mt-0.5 flex-shrink-0"></i>
+                            <div class="flex-1 text-sm">
+                                <h4 class="font-bold text-purple-900 mb-1">💰 稅率與退稅</h4>
+                                <p class="text-purple-800">${tips.tax || '暫無信息'}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-sky-50 border border-sky-200 rounded-lg p-3">
+                        <div class="flex items-start gap-2">
+                            <i class="fa-solid fa-lightbulb text-sky-600 text-lg mt-0.5 flex-shrink-0"></i>
+                            <div class="flex-1 text-sm">
+                                <h4 class="font-bold text-sky-900 mb-1">✨ 旅遊小貼士</h4>
+                                <p class="text-sky-800 whitespace-pre-wrap">${tips.tips || '暫無信息'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+        
+        async function generateTipsWithGemini(country, apiKey) {
+            try {
+                const countryInfo = countryTipsDatabase[country];
+                const itineraryText = JSON.stringify(window.currentItineraryData, null, 2).substring(0, 1000);
+                
+                const prompt = `你是一位經驗豐富的旅遊專家。根據以下行程信息，為旅客提供詳細的旅遊建議。
+
+國家: ${countryInfo.name}
+行程摘要: ${itineraryText}
+
+請以 JSON 格式提供以下信息（務必是有效的 JSON 格式）:
+{
+  "safety": "該地的治安狀況和安全建議（150字以內）",
+  "customs": "風土民情和禮儀注意事項（150字以內）",
+  "entry": "出入境須知和簽證要求（150字以內）",
+  "tax": "稅率、退稅政策和金融建議（150字以內）",
+  "tips": "旅遊小貼士，包括交通、飲食、購物、住宿等（300字以內）"
+}
+
+回覆時只需提供 JSON 對象，不需要其他文字。`;
+
+                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: prompt }]
+                        }],
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 1200
+                        }
+                    })
+                });
+                
+                if (!response.ok) {
+                    console.error('Gemini API 錯誤:', response.status);
+                    return null;
+                }
+                
+                const data = await response.json();
+                if (!data.candidates || !data.candidates[0].content.parts[0].text) {
+                    console.error('Gemini 回應格式錯誤');
+                    return null;
+                }
+                
+                const responseText = data.candidates[0].content.parts[0].text;
+                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    console.error('無法從 Gemini 回應中提取 JSON');
+                    return null;
+                }
+                
+                const tips = JSON.parse(jsonMatch[0]);
+                return {
+                    country: countryTipsDatabase[country].name,
+                    ...tips,
+                    source: 'gemini'
+                };
+            } catch (error) {
+                console.error('Gemini API 調用失敗:', error);
+                return null;
+            }
+        }
+        
         function focusLocation(lat, lng) {
             map.invalidateSize(); 
             if (map.getContainer().offsetWidth > 0) map.flyTo([lat, lng], 16, { duration: 1 });
@@ -1212,3 +1654,4 @@
     </script>
 </body>
 </html>
+
