@@ -589,18 +589,95 @@
             const dayForecasts = list.filter(item => item.dt_txt.startsWith(targetDateStr));
             if (dayForecasts.length === 0) return null;
             
-            // 計算平均溫度和主要天氣
+            // 計算詳細天氣數據
             const temps = dayForecasts.map(f => f.main.temp);
             const avgTemp = Math.round(temps.reduce((a, b) => a + b, 0) / temps.length);
+            const minTemp = Math.min(...temps);
+            const maxTemp = Math.max(...temps);
             const weather = dayForecasts[0].weather[0];
+            
+            // 新增詳細字段
+            const humidity = dayForecasts[0].main.humidity;
+            const windSpeed = dayForecasts[0].wind.speed;
+            const feelsLike = Math.round(dayForecasts[0].main.feels_like);
+            const precipitation = dayForecasts.reduce((sum, f) => sum + (f.rain?.['3h'] || 0), 0);
+            const uvIndex = dayForecasts[0].uvi || 'N/A';
+            
+            // 計算穿衣建議
+            const clothingSuggestion = window.getClothingSuggestion(avgTemp, weather.main, humidity, windSpeed);
             
             return {
                 temp: avgTemp,
+                minTemp: minTemp,
+                maxTemp: maxTemp,
+                feelsLike: feelsLike,
                 description: weather.main,
                 icon: weather.icon,
-                humidity: dayForecasts[0].main.humidity,
-                windSpeed: dayForecasts[0].wind.speed
+                humidity: humidity,
+                windSpeed: windSpeed,
+                precipitation: precipitation,
+                uvIndex: uvIndex,
+                clothingSuggestion: clothingSuggestion
             };
+        };
+        
+        // 新增：根據天氣情況生成穿衣建議
+        window.getClothingSuggestion = (temp, weatherType, humidity, windSpeed) => {
+            const suggestions = [];
+            
+            // 溫度判斷
+            if (temp < 0) {
+                suggestions.push('❄️ 極寒：穿厚羽絨服、發熱衣、毛帽、圍巾和手套。');
+                suggestions.push('👢 建議穿防滑雪靴。');
+            } else if (temp < 10) {
+                suggestions.push('🧥 寒冷：穿厚外套、毛衣。');
+                suggestions.push('🧣 建議配戴圍巾和手套。');
+                suggestions.push('👖 穿著保暖長褲。');
+            } else if (temp < 15) {
+                suggestions.push('🧥 涼爽：薄夾克或衛衣即可。');
+                suggestions.push('👖 搭配長褲。');
+            } else if (temp < 20) {
+                suggestions.push('👕 長袖 T 恤或薄襯衫。');
+                suggestions.push('🧥 早晚可能偏涼，建議帶件薄外套。');
+            } else if (temp < 25) {
+                suggestions.push('👕 短袖 T 恤。');
+                suggestions.push('👖 可穿薄長褲或短褲。');
+                suggestions.push('🕶️ 陽光好，可戴太陽眼鏡。');
+            } else {
+                suggestions.push('👕 炎熱：穿輕薄短袖、透氣材質的衣物。');
+                suggestions.push('👖 短褲或涼感褲。');
+                suggestions.push('☀️ 務必注意防曬，擦防曬乳、戴帽。');
+            }
+            
+            // 天氣類型調整
+            const lowerCaseWeather = weatherType.toLowerCase();
+            if (lowerCaseWeather.includes('rain') || lowerCaseWeather.includes('drizzle')) {
+                suggestions.push('☔️ 有雨：記得攜帶雨傘或雨衣。');
+                suggestions.push('👟 建議穿防水的鞋子。');
+            }
+            if (lowerCaseWeather.includes('snow')) {
+                suggestions.push('❄️ 下雪：穿防水外套和雪靴。');
+                suggestions.push('🧤 手套和毛帽是必需品。');
+            }
+            if (lowerCaseWeather.includes('clear') && temp > 15) {
+                suggestions.push('☀️ 晴天紫外線強，注意防曬。');
+            }
+            
+            // 濕度提醒
+            if (humidity > 80 && temp > 20) {
+                suggestions.push('💧 濕熱：選擇吸濕排汗的衣物。');
+            }
+            
+            // 風速提醒
+            if (windSpeed > 10) { // m/s
+                suggestions.push('💨 風大：建議穿防風外套。');
+            }
+
+            if (suggestions.length === 0) {
+                suggestions.push('白天溫差大，建議洋蔥式穿搭。');
+            }
+            
+            return suggestions;
         };
 
         window.toggleEditMode = () => { if (isEditMode) saveEdits(); isEditMode = !isEditMode; updateEditUI(); };
@@ -781,19 +858,34 @@
                     else if (weatherData.description.includes("Rain")) iconClass = "fa-umbrella text-blue-500";
                     else if (weatherData.description.includes("Cloud")) iconClass = "fa-cloud text-slate-400";
                     
-                    item.innerHTML = `<div>
-                        <span class="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded">${displayDate}</span>
-                        <div class="mt-2 text-xs text-slate-500">
-                            <div>濕度: ${weatherData.humidity}%</div>
-                            <div>風速: ${(weatherData.windSpeed * 3.6).toFixed(1)} km/h</div>
+                    // 構建詳細天氣信息
+                    const clothingHtml = weatherData.clothingSuggestion 
+                        ? `<div class="mt-3 pt-3 border-t border-orange-100">
+                            <div class="text-xs font-bold text-orange-600 mb-2">👕 穿衣建議：</div>
+                            <div class="text-xs text-slate-600 space-y-1">
+                                ${weatherData.clothingSuggestion.map(s => `<div>• ${s}</div>`).join('')}
+                            </div>
+                          </div>`
+                        : '';
+                    
+                    item.innerHTML = `<div class="w-full">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded">${displayDate}</span>
+                            <i class="fa-solid ${iconClass} text-lg"></i>
                         </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid ${iconClass} text-2xl"></i>
-                        <div class="text-right">
-                            <div class="font-bold text-lg">${weatherData.temp}°C</div>
-                            <div class="text-xs text-slate-500">${weatherData.description}</div>
+                        <div class="text-sm font-semibold text-slate-800 mb-2">${weatherData.description}</div>
+                        
+                        <div class="grid grid-cols-2 gap-2 text-xs text-slate-600 mb-2">
+                            <div>🌡️ 平均: ${weatherData.temp}°C</div>
+                            <div>📊 體感: ${weatherData.feelsLike}°C</div>
+                            <div>🔼 高: ${weatherData.maxTemp.toFixed(1)}°C</div>
+                            <div>🔽 低: ${weatherData.minTemp.toFixed(1)}°C</div>
+                            <div>💧 濕度: ${weatherData.humidity}%</div>
+                            <div>💨 風速: ${weatherData.windSpeed.toFixed(1)} m/s</div>
+                            ${weatherData.precipitation > 0 ? `<div>🌧️ 降水: ${weatherData.precipitation.toFixed(1)}mm</div>` : ''}
                         </div>
+                        
+                        ${clothingHtml}
                     </div>`;
                 } else {
                     const weatherText = day.weather || "未知";
@@ -1654,4 +1746,5 @@ ${itineraryText}
     </script>
 </body>
 </html>
+
 
