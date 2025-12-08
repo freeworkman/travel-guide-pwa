@@ -17,6 +17,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- LZString 壓縮庫 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+    <!-- Chart.js for Cost Analysis -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         /* --- iOS Critical Fixes --- */
@@ -86,10 +88,8 @@
         [contenteditable="true"] { border: 1px dashed #0ea5e9; padding: 2px; border-radius: 4px; background-color: #f0f9ff; outline: none; }
         [contenteditable="true"]:focus { border: 1px solid #0ea5e9; background-color: white; }
         
-        /* Button Touch Targets */
         .touch-btn { min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; }
         
-        /* Mobile Touch Button Adjustments */
         @media (max-width: 767px) {
             .touch-btn { min-height: 48px; min-width: 48px; padding: 8px !important; }
             header { min-height: auto; }
@@ -98,76 +98,41 @@
 </head>
 <body>
 
-    <!-- 1. Core Utilities & UI Logic (Loaded First) -->
+    <!-- Core Utilities -->
     <script>
-        window.onerror = function(msg, url, line, col, error) { 
-            // console.error("App Error:", msg, error); 
-        };
-        
-        // UI Utils - Defined early to avoid ReferenceError
+        window.onerror = function(msg, url, line, col, error) { console.error("App Error:", msg, error); };
         window.showToast = function(msg) { 
-            const t = document.getElementById('toast'); 
-            if(!t) return; 
-            document.getElementById('toastMsg').innerText = msg; 
-            t.classList.remove('hidden'); 
+            const t = document.getElementById('toast'); if(!t) return; 
+            document.getElementById('toastMsg').innerText = msg; t.classList.remove('hidden'); 
             setTimeout(() => t.classList.add('hidden'), 3000); 
         };
-        
-        window.closeModal = function(id) { 
-            document.getElementById(id).classList.add('hidden'); 
-        };
-        
-        // Safe Storage
+        window.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
         window.safeStorage = { 
             getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } }, 
             setItem: (key, val) => { try { localStorage.setItem(key, val); } catch (e) { } } 
         };
-
-        // Clipboard Helper
         window.copyToClipboard = async function(text) {
-            try { 
-                await navigator.clipboard.writeText(text); 
-                return true; 
-            } catch (err) {
+            try { await navigator.clipboard.writeText(text); return true; } catch (err) {
                 const textArea = document.createElement("textarea");
                 textArea.value = text; textArea.style.top = "0"; textArea.style.left = "0"; textArea.style.position = "fixed";
                 document.body.appendChild(textArea); textArea.focus(); textArea.select();
-                try { const success = document.execCommand('copy'); document.body.removeChild(textArea); return success; } 
-                catch (err) { document.body.removeChild(textArea); return false; }
+                try { const success = document.execCommand('copy'); document.body.removeChild(textArea); return success; } catch (err) { document.body.removeChild(textArea); return false; }
             }
         };
-
-        // --- Moved UI Triggers Here to ensure they exist when HTML is parsed ---
+        // Global Triggers
         window.openAIModal = () => document.getElementById('aiModal').classList.remove('hidden');
         window.openHistoryModal = () => document.getElementById('historyModal').classList.remove('hidden');
         window.openShareModal = () => document.getElementById('shareModal').classList.remove('hidden');
-        
         window.openSettingsModal = () => {
             const savedKey = window.safeStorage.getItem('gemini_api_key');
             if(savedKey) document.getElementById('settingsApiKey').value = savedKey;
             document.getElementById('settingsModal').classList.remove('hidden');
         };
-
-        window.toggleIosGuide = () => {
-             const guide = document.getElementById('iosGuide');
-             const arrow = document.getElementById('iosGuideArrow');
-             if (guide.classList.contains('hidden')) {
-                 guide.classList.remove('hidden');
-                 arrow.classList.add('rotate-180');
-             } else {
-                 guide.classList.add('hidden');
-                 arrow.classList.remove('rotate-180');
-             }
-        };
-
         window.fillExamplePrompt = (e) => {
             e.preventDefault();
-            const promptInput = document.getElementById('aiPromptInput');
-            const startDateInput = document.getElementById('aiStartDate');
-            promptInput.value = "規劃一個北海道 5 天 4 夜的冬季行程，想要看企鵝散步、吃帝王蟹、泡溫泉，交通以大眾運輸為主。";
-            const date = new Date();
-            date.setMonth(date.getMonth() + 1);
-            startDateInput.value = date.toISOString().split('T')[0];
+            document.getElementById('aiPromptInput').value = "規劃一個北海道 5 天 4 夜的冬季行程，想要看企鵝散步、吃帝王蟹、泡溫泉，交通以大眾運輸為主。";
+            const date = new Date(); date.setMonth(date.getMonth() + 1);
+            document.getElementById('aiStartDate').value = date.toISOString().split('T')[0];
         };
     </script>
 
@@ -182,12 +147,8 @@
             <h1 class="sm:hidden font-bold text-base leading-tight">旅遊嚮導</h1>
         </div>
         
-        <!-- Desktop Buttons Row -->
         <div class="hidden md:flex gap-2 items-center flex-shrink-0">
-            <button onclick="openSettingsModal()" id="settingsBtn" class="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-full flex items-center gap-2 transition-colors border border-white/20 touch-btn text-sm" title="連結 AI">
-                <i id="settingsIcon" class="fa-solid fa-link text-base"></i> 
-                <span id="keyStatusText" class="text-sm font-bold">連結 AI</span>
-            </button>
+            <button onclick="openSettingsModal()" id="settingsBtn" class="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-full flex items-center gap-2 transition-colors border border-white/20 touch-btn text-sm" title="連結 AI"><i id="settingsIcon" class="fa-solid fa-link text-base"></i> <span id="keyStatusText" class="text-sm font-bold">連結 AI</span></button>
             <button onclick="openShareModal()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-share-nodes text-base"></i> <span>分享</span></button>
             <button onclick="openHistoryModal()" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-folder-open text-base"></i> <span>行程</span></button>
             <button onclick="saveCurrentItinerary()" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-floppy-disk text-base"></i> <span>儲存</span></button>
@@ -195,11 +156,8 @@
             <button onclick="window.openFlightSearch()" class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-full font-bold shadow-md flex items-center gap-2 active:scale-95 border border-white/20 touch-btn text-sm"><i class="fa-solid fa-plane text-base"></i> <span>航班</span></button>
         </div>
         
-        <!-- Mobile Compact Buttons Row -->
         <div class="md:hidden flex gap-1.5 items-center justify-end flex-wrap w-full">
-            <button onclick="openSettingsModal()" id="settingsBtn" class="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full flex items-center gap-0 transition-colors border border-white/20 touch-btn" title="連結 AI">
-                <i id="settingsIcon" class="fa-solid fa-link text-base"></i> 
-            </button>
+            <button onclick="openSettingsModal()" id="settingsBtnMobile" class="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full flex items-center gap-0 transition-colors border border-white/20 touch-btn"><i class="fa-solid fa-link text-base"></i></button>
             <button onclick="openShareModal()" class="bg-sky-600 hover:bg-sky-700 text-white p-2 rounded-full font-bold shadow-sm flex items-center gap-0 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-share-nodes text-base"></i></button>
             <button onclick="openHistoryModal()" class="bg-sky-600 hover:bg-sky-700 text-white p-2 rounded-full font-bold shadow-sm flex items-center gap-0 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-folder-open text-base"></i></button>
             <button onclick="saveCurrentItinerary()" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded-full font-bold shadow-sm flex items-center gap-0 active:scale-95 border border-white/20 touch-btn"><i class="fa-solid fa-floppy-disk text-base"></i></button>
@@ -210,14 +168,15 @@
 
     <!-- Main Content -->
     <main>
-        <!-- Left Panel (Itinerary List) -->
+        <!-- Left Panel -->
         <section id="itineraryPanel" class="mobile-tab-content active panel-container md:w-[450px] bg-white border-r border-slate-200">
             <div class="bg-sky-50 p-3 border-b border-sky-100 flex justify-between items-center text-sm text-sky-800 select-none shrink-0" id="headerInfo">
-                <div class="flex gap-3">
-                    <span class="flex items-center gap-2 cursor-pointer hover:bg-sky-100 px-2.5 py-1.5 rounded transition-colors" onclick="toggleCurrency()"><i class="fa-solid fa-coins text-sky-600 text-lg"></i> <span id="headerCurrency" class="font-medium">--</span><i class="fa-solid fa-rotate text-xs ml-1 text-sky-400"></i></span>
-                    <span class="flex items-center gap-2 cursor-pointer hover:bg-sky-100 px-2.5 py-1.5 rounded transition-colors" onclick="openWeatherModal()"><i class="fa-solid fa-cloud-sun text-sky-600 text-lg"></i> <span id="headerWeather" class="font-medium">--</span><i class="fa-solid fa-list-ul text-xs ml-1 text-sky-400"></i></span>
+                <div class="flex gap-2 overflow-x-auto no-scrollbar">
+                    <span class="flex items-center gap-1 cursor-pointer hover:bg-sky-100 px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="toggleCurrency()"><i class="fa-solid fa-coins text-sky-600"></i> <span id="headerCurrency" class="font-medium">--</span></span>
+                    <span class="flex items-center gap-1 cursor-pointer hover:bg-sky-100 px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="openWeatherModal()"><i class="fa-solid fa-cloud-sun text-sky-600"></i> 天氣</span>
+                    <!-- Location removed from here as requested -->
                 </div>
-                <button id="editToggleBtn" onclick="toggleEditMode()" class="text-sky-600 hover:bg-sky-100 px-3 py-1.5 rounded transition-colors flex items-center gap-2 font-medium"><i class="fa-regular fa-pen-to-square text-lg"></i> <span id="editBtnText">編輯</span></button>
+                <button id="editToggleBtn" onclick="toggleEditMode()" class="text-sky-600 hover:bg-sky-100 px-3 py-1.5 rounded transition-colors flex items-center gap-2 font-medium shrink-0"><i class="fa-regular fa-pen-to-square"></i> <span id="editBtnText">編輯</span></button>
             </div>
             <div id="dayTabsContainer" class="flex overflow-x-auto bg-white p-2 border-b border-slate-100 gap-2 shrink-0 no-scrollbar shadow-sm" style="min-height: 60px;"></div>
             <div id="contentList" class="p-4 space-y-4 bg-slate-50"></div> 
@@ -226,7 +185,6 @@
         <!-- Right Panel (Map) -->
         <section id="mapPanel" class="mobile-tab-content panel-container w-full md:flex-1 bg-slate-100">
             <div id="map"></div>
-            <!-- Map Search Bar -->
             <div class="absolute top-4 left-4 z-[400] w-80 max-w-[calc(100%-2rem)] md:w-96">
                 <div class="flex gap-2">
                     <input type="text" id="mapSearchInput" placeholder="搜尋地點..." class="flex-1 p-3 rounded-lg border border-slate-200 shadow-md focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
@@ -238,9 +196,7 @@
                 <button onclick="map.zoomIn()" class="w-12 h-12 bg-white rounded shadow text-slate-600 hover:text-sky-600 font-bold text-2xl flex items-center justify-center">+</button>
                 <button onclick="map.zoomOut()" class="w-12 h-12 bg-white rounded shadow text-slate-600 hover:text-sky-600 font-bold text-2xl flex items-center justify-center">-</button>
             </div>
-            <button onclick="refreshMapLayout()" class="absolute bottom-24 right-4 z-[400] w-12 h-12 bg-white rounded-full shadow text-slate-600 hover:text-sky-600 flex items-center justify-center md:hidden" title="重整地圖">
-                <i class="fa-solid fa-rotate text-lg"></i>
-            </button>
+            <button onclick="refreshMapLayout()" class="absolute bottom-24 right-4 z-[400] w-12 h-12 bg-white rounded-full shadow text-slate-600 hover:text-sky-600 flex items-center justify-center md:hidden" title="重整地圖"><i class="fa-solid fa-rotate text-lg"></i></button>
         </section>
     </main>
 
@@ -250,32 +206,26 @@
         <button onclick="toggleMobileView('map')" id="nav-map" class="flex-1 flex flex-col items-center justify-center text-slate-400 touch-btn"><i class="fa-regular fa-map text-2xl mb-1"></i><span class="text-xs font-bold">地圖模式</span></button>
     </nav>
 
-    <!-- Share Modal -->
+    <!-- Modals -->
     <div id="shareModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100 flex flex-col max-h-[90vh]">
-            <div class="bg-sky-600 p-4 flex justify-between items-center text-white shrink-0">
-                <h3 class="font-bold text-lg"><i class="fa-solid fa-share-nodes mr-2"></i>分享行程</h3>
-                <button onclick="closeModal('shareModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button>
-            </div>
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-sky-600 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-lg"><i class="fa-solid fa-share-nodes mr-2"></i>分享行程</h3><button onclick="closeModal('shareModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div>
             <div class="p-6 space-y-5 overflow-y-auto text-base">
-                <button onclick="copyWebLink()" class="w-full py-3.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-bold hover:from-pink-600 hover:to-purple-700 shadow-md flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-link text-lg"></i> 複製應用程式連結
-                </button>
-                <p class="text-sm text-slate-400 text-center -mt-2">分享網址給朋友。</p>
+                <button onclick="copyWebLink()" class="w-full py-3.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-bold hover:from-pink-600 hover:to-purple-700 shadow-md flex items-center justify-center gap-2"><i class="fa-solid fa-link text-lg"></i> 複製應用程式連結</button>
                 <div class="border-t border-slate-100 my-2"></div>
                 <button onclick="shareToLine()" class="w-full py-3.5 bg-[#06C755] text-white rounded-xl font-bold hover:bg-[#05b64d] shadow-sm flex items-center justify-center gap-2"><i class="fa-brands fa-line text-xl"></i> 分享到 LINE</button>
-                <div class="border-t border-slate-100 my-2"></div>
-                <button onclick="shareAsCode()" class="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-sm flex items-center justify-center gap-2"><i class="fa-solid fa-code text-lg"></i> 複製行程資料碼 (App互傳)</button>
-                <button onclick="copyItineraryText()" class="w-full py-3.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 border border-slate-200 flex items-center justify-center gap-2"><i class="fa-regular fa-copy text-lg"></i> 複製純文字</button>
+                <button onclick="shareAsCode()" class="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-sm flex items-center justify-center gap-2"><i class="fa-solid fa-code text-lg"></i> 複製行程資料碼</button>
             </div>
         </div>
     </div>
 
-    <!-- Other Modals (AI, History, Weather, Settings) -->
-    <div id="aiModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100"><div class="bg-gradient-to-r from-sky-500 to-blue-600 p-4 flex justify-between items-center text-white"><h3 class="font-bold text-xl"><i class="fa-solid fa-plane-up mr-2"></i>AI 行程規劃</h3><button onclick="closeModal('aiModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div><div class="p-6 space-y-4"><div class="mb-2"><label class="block text-sm font-bold text-slate-500 mb-1 uppercase">出發日期</label><input type="date" id="aiStartDate" class="w-full p-3 border border-slate-200 rounded-lg text-base bg-slate-50 text-slate-700"></div><div class="mb-2"><label class="block text-sm font-bold text-slate-500 mb-1 uppercase">旅遊偏好</label><textarea id="aiPromptInput" class="w-full p-4 border border-slate-200 rounded-lg text-base bg-slate-50" rows="4" placeholder="例：規劃一個京都 5 天 4 夜的賞楓行程，要包含嵐山小火車..."></textarea></div><div class="text-right"><a href="#" onclick="fillExamplePrompt(event)" class="text-sm text-sky-500 hover:underline">⚡ 試試範例</a></div><div id="aiErrorMsg" class="hidden mt-2 text-red-500 text-sm flex items-center gap-1"><i class="fa-solid fa-circle-exclamation"></i> <span>發生錯誤</span></div><div class="mt-4 flex gap-4"><button onclick="closeModal('aiModal')" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200">取消</button><button onclick="window.handleGenerateClick()" id="generateBtn" class="flex-1 py-3 bg-sky-500 text-white rounded-xl font-bold hover:bg-sky-600 shadow-lg flex justify-center items-center gap-2"><span>出發！</span><i class="fa-solid fa-paper-plane"></i></button></div></div></div></div>
-    <div id="historyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[80vh] flex flex-col overflow-hidden transform transition-all scale-100"><div class="bg-slate-800 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-xl"><i class="fa-solid fa-folder-open mr-2"></i>我的行程</h3><div class="flex items-center gap-3"><button onclick="importItinerary()" class="text-sky-300 hover:text-white text-sm font-bold flex items-center gap-1 p-2"><i class="fa-solid fa-file-import text-lg"></i> 匯入</button><button onclick="closeModal('historyModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div></div><div id="historyList" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50"><div class="text-center text-slate-400 mt-10">載入中...</div></div></div></div>
-    <div id="weatherModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[70vh] flex flex-col overflow-hidden transform transition-all scale-100"><div class="bg-orange-500 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-xl"><i class="fa-solid fa-cloud-sun mr-2"></i>全程天氣概況</h3><button onclick="closeModal('weatherModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div><div id="weatherList" class="flex-1 overflow-y-auto p-4 space-y-3 bg-orange-50"><div class="text-center text-slate-400 mt-10">載入中...</div></div></div></div>
-    <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100"><div class="bg-slate-800 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-xl"><i class="fa-solid fa-robot mr-2"></i>連結 Google AI</h3><button onclick="closeModal('settingsModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div><div class="p-6 space-y-6"><div class="space-y-2"><p class="text-sm font-bold text-slate-400 uppercase">第一步：取得免費金鑰</p><a href="https://aistudio.google.com/app/apikey" target="_blank" class="flex items-center justify-between w-full py-3.5 px-5 bg-sky-50 text-sky-700 rounded-xl font-bold hover:bg-sky-100 transition-colors border border-sky-100 group"><span class="flex items-center gap-2"><i class="fa-brands fa-google text-xl"></i> 開啟 Google AI Studio</span><i class="fa-solid fa-arrow-up-right-from-square text-sm opacity-50 group-hover:opacity-100"></i></a></div><div class="border-t border-slate-100"></div><div class="space-y-2"><p class="text-sm font-bold text-slate-400 uppercase">第二步：貼上並連結</p><div class="flex gap-2"><input type="password" id="settingsApiKey" class="flex-1 p-3.5 border border-slate-300 rounded-lg text-base bg-white focus:ring-2 focus:ring-sky-500 outline-none" placeholder="在此貼上 API Key..."><button onclick="pasteApiKey()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 rounded-lg border border-slate-200 transition-colors flex flex-col items-center justify-center whitespace-nowrap" title="讀取剪貼簿"><i class="fa-regular fa-clipboard text-lg"></i><span class="text-xs font-bold">貼上</span></button></div></div><button onclick="saveSettings()" class="w-full py-3.5 bg-sky-600 text-white rounded-xl text-base font-bold hover:bg-sky-700 shadow-lg flex justify-center items-center gap-2"><i class="fa-solid fa-link"></i> 確認連結</button><div class="text-center pt-2"><button onclick="useDemoMode()" class="text-sm text-slate-400 hover:text-slate-600 hover:underline">先使用模擬模式試玩</button></div></div></div></div>
+    <div id="aiModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"><div class="bg-gradient-to-r from-sky-500 to-blue-600 p-4 flex justify-between items-center text-white"><h3 class="font-bold text-xl"><i class="fa-solid fa-plane-up mr-2"></i>AI 行程規劃</h3><button onclick="closeModal('aiModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div><div class="p-6 space-y-4"><div class="mb-2"><label class="block text-sm font-bold text-slate-500 mb-1 uppercase">出發日期</label><input type="date" id="aiStartDate" class="w-full p-3 border border-slate-200 rounded-lg text-base bg-slate-50 text-slate-700"></div><div class="mb-2"><label class="block text-sm font-bold text-slate-500 mb-1 uppercase">旅遊偏好</label><textarea id="aiPromptInput" class="w-full p-4 border border-slate-200 rounded-lg text-base bg-slate-50" rows="4" placeholder="例：規劃一個京都 5 天 4 夜的賞楓行程，要包含嵐山小火車..."></textarea></div><div class="text-right"><a href="#" onclick="fillExamplePrompt(event)" class="text-sm text-sky-500 hover:underline">⚡ 試試範例</a></div><div id="aiErrorMsg" class="hidden mt-2 text-red-500 text-sm flex items-center gap-1"><i class="fa-solid fa-circle-exclamation"></i> <span>發生錯誤</span></div><div class="mt-4 flex gap-4"><button onclick="closeModal('aiModal')" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200">取消</button><button onclick="window.handleGenerateClick()" id="generateBtn" class="flex-1 py-3 bg-sky-500 text-white rounded-xl font-bold hover:bg-sky-600 shadow-lg flex justify-center items-center gap-2"><span>出發！</span><i class="fa-solid fa-paper-plane"></i></button></div></div></div></div>
+    
+    <div id="historyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[80vh] flex flex-col overflow-hidden"><div class="bg-slate-800 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-xl"><i class="fa-solid fa-folder-open mr-2"></i>我的行程</h3><div class="flex items-center gap-3"><button onclick="importItinerary()" class="text-sky-300 hover:text-white text-sm font-bold flex items-center gap-1 p-2"><i class="fa-solid fa-file-import text-lg"></i> 匯入</button><button onclick="closeModal('historyModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div></div><div id="historyList" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50"><div class="text-center text-slate-400 mt-10">載入中...</div></div></div></div>
+    
+    <div id="weatherModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[70vh] flex flex-col overflow-hidden"><div class="bg-orange-500 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-xl"><i class="fa-solid fa-cloud-sun mr-2"></i>全程天氣概況</h3><button onclick="closeModal('weatherModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div><div id="weatherList" class="flex-1 overflow-y-auto p-4 space-y-3 bg-orange-50"><div class="text-center text-slate-400 mt-10">載入中...</div></div></div></div>
+    
+    <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"><div class="bg-slate-800 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-xl"><i class="fa-solid fa-robot mr-2"></i>連結 Google AI</h3><button onclick="closeModal('settingsModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div><div class="p-6 space-y-6"><div class="space-y-2"><p class="text-sm font-bold text-slate-400 uppercase">第一步：取得免費金鑰</p><a href="https://aistudio.google.com/app/apikey" target="_blank" class="flex items-center justify-between w-full py-3.5 px-5 bg-sky-50 text-sky-700 rounded-xl font-bold hover:bg-sky-100 transition-colors border border-sky-100 group"><span class="flex items-center gap-2"><i class="fa-brands fa-google text-xl"></i> 開啟 Google AI Studio</span><i class="fa-solid fa-arrow-up-right-from-square text-sm opacity-50 group-hover:opacity-100"></i></a></div><div class="border-t border-slate-100"></div><div class="space-y-2"><p class="text-sm font-bold text-slate-400 uppercase">第二步：貼上並連結</p><div class="flex gap-2"><input type="password" id="settingsApiKey" class="flex-1 p-3.5 border border-slate-300 rounded-lg text-base bg-white focus:ring-2 focus:ring-sky-500 outline-none" placeholder="在此貼上 API Key..."><button onclick="pasteApiKey()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 rounded-lg border border-slate-200 transition-colors flex flex-col items-center justify-center whitespace-nowrap" title="讀取剪貼簿"><i class="fa-regular fa-clipboard text-lg"></i><span class="text-xs font-bold">貼上</span></button></div></div><button onclick="saveSettings()" class="w-full py-3.5 bg-sky-600 text-white rounded-xl text-base font-bold hover:bg-sky-700 shadow-lg flex justify-center items-center gap-2"><i class="fa-solid fa-link"></i> 確認連結</button><div class="text-center pt-2"><button onclick="useDemoMode()" class="text-sm text-slate-400 hover:text-slate-600 hover:underline">先使用模擬模式試玩</button></div></div></div></div>
     
     <div id="toast" class="hidden fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-5 py-3 rounded-full shadow-xl z-[100] text-base font-bold flex items-center gap-3"><i class="fa-solid fa-check-circle text-green-400 text-xl"></i> <span id="toastMsg">已儲存</span></div>
 
@@ -318,12 +268,20 @@
             if(saveBtn) { originalIcon = saveBtn.innerHTML; saveBtn.innerHTML = `<div class="loader w-4 h-4 border-2 border-white border-t-transparent"></div>`; saveBtn.disabled = true; }
 
             try {
+                // Modified: Filename as Country - Title
                 let title = "未命名行程";
                 const day1 = window.currentItineraryData["1"];
-                if (day1 && day1.title) title = day1.title.split(':')[0] + " 之旅";
-                if (window.currentMetaData && window.currentMetaData.startDate) title += ` (${window.currentMetaData.startDate})`;
+                const meta = window.currentMetaData || {};
+                
+                if (day1 && day1.title) {
+                    const rawTitle = day1.title.split(':')[0].replace(/Day \d+/, '').trim() || day1.title;
+                    const country = meta.country || (meta.main_location ? meta.main_location.split(',')[0] : '旅程');
+                    title = `[${country}] ${rawTitle}`;
+                }
+                
+                if (meta.startDate) title += ` (${meta.startDate})`;
 
-                const docData = { title: title, data: window.currentItineraryData, meta: window.currentMetaData || {}, updatedAt: isLocalMode ? new Date().toISOString() : Timestamp.now() };
+                const docData = { title: title, data: window.currentItineraryData, meta: meta, updatedAt: isLocalMode ? new Date().toISOString() : Timestamp.now() };
 
                 if (window.currentDocId) {
                     if (isLocalMode) {
@@ -351,7 +309,7 @@
                     }
                     window.showToast("新行程已儲存！");
                 }
-            } catch (e) { window.showToast("儲存失敗"); } 
+            } catch (e) { window.showToast("儲存失敗"); console.error(e); } 
             finally { if(saveBtn) { saveBtn.innerHTML = originalIcon; saveBtn.disabled = false; } }
         };
 
@@ -415,54 +373,14 @@
 
     <script>
         const envApiKey = ""; 
-        const OPENWEATHER_API_KEY = "f2dcf92ac0c917a85ced2e416d61b385"; // 請設定你的 OpenWeatherMap API Key
+        const OPENWEATHER_API_KEY = "f2dcf92ac0c917a85ced2e416d61b385"; 
         window.currentItineraryData = null;
         window.currentMetaData = null;
         window.currentDocId = null;
         let map, markers = {}, currentPolyline = null, currentBounds = null, currentDay = 1;
         let isEditMode = false;
-        let weatherCache = {}; // 快取天氣資料
+        let weatherCache = {}; 
         
-        // 【新增】城市/地點到國家的對應表 - 用於偵測行程目的地
-        const locationToCountry = {
-            '京都': 'Japan', '東京': 'Japan', 'tokyo': 'Japan', 'kyoto': 'Japan',
-            '大阪': 'Japan', '奈良': 'Japan', '札幌': 'Japan', '福岡': 'Japan',
-            '清水寺': 'Japan', '伏見稻荷': 'Japan', '嵐山': 'Japan',
-            '台北': 'Taiwan', '台湾': 'Taiwan', '台灣': 'Taiwan', 'taipei': 'Taiwan',
-            '高雄': 'Taiwan', '台中': 'Taiwan', '墾丁': 'Taiwan', '日月潭': 'Taiwan',
-            '曼谷': 'Thailand', 'bangkok': 'Thailand', '清邁': 'Thailand', '普吉島': 'Thailand',
-            '首爾': 'South Korea', 'seoul': 'South Korea', '釜山': 'South Korea', '仁川': 'South Korea',
-            '新加坡': 'Singapore', 'singapore': 'Singapore',
-            '紐約': 'USA', '洛杉磯': 'USA', '舊金山': 'USA', '芝加哥': 'USA',
-            'new york': 'USA', 'los angeles': 'USA', 'san francisco': 'USA',
-            '巴黎': 'France', 'paris': 'France', '馬賽': 'France',
-            '柏林': 'Germany', 'berlin': 'Germany', '慕尼黑': 'Germany',
-            '蘇黎世': 'Switzerland', 'zurich': 'Switzerland', '日內瓦': 'Switzerland', 'geneva': 'Switzerland',
-            '馬德里': 'Spain', 'madrid': 'Spain', '巴塞隆納': 'Spain',
-            '羅馬': 'Italy', 'rome': 'Italy', '威尼斯': 'Italy', '佛羅倫斯': 'Italy',
-            '雪梨': 'Australia', 'sydney': 'Australia', '墨爾本': 'Australia', '布里斯班': 'Australia',
-            '奧克蘭': 'New Zealand', 'auckland': 'New Zealand', '威靈頓': 'New Zealand', 'wellington': 'New Zealand',
-            '皇后鎮': 'New Zealand', 'queenstown': 'New Zealand', '羅托魯瓦': 'New Zealand'
-        };
-        
-        // 【新增】國家旅遊資訊資料庫
-        const countryTipsDatabase = {
-            'Japan': { name: '日本', safety: '非常安全，犯罪率極低。深夜外出也相對安全。建議避開偏遠山區。', customs: '非常重視禮儀和秩序。在公共場合保持安靜，不要在火車上打電話。廟宇參拜時脫鞋。脫鞋時要整齊排放。', entry: '台灣護照可享 90 天免簽。入境時填寫入境卡。機場提供 WiFi 和 SIM 卡。準備好食物過敏信息的日語卡片。', tax: '消費稅 10%（某些商品 8%）。遊客在百貨公司消費超 5,000 日圓可辦理退稅。退稅需要護照。', tips: '【交通】JR Pass 超划算，含新幹線。【飲食】現金為主，部分店家不收卡。【溫泉】下水前需沖洗身體。【住宿】Check-in 通常 15:00，Check-out 11:00。【購物】藥妝店和百貨公司多。【語言】英文在大城市可通，鄉村地區建議下載翻譯 App。' },
-            'Taiwan': { name: '台灣', safety: '非常安全，位居亞洲最安全國家。治安良好，警察友善。', customs: '民間信仰與廟宇文化濃厚。尊重長者，問候時雙手合十。台灣人熱情好客。', entry: '無需簽證。機場提供便利的交通接駁。', tax: '消費稅已包含在標價中。無退稅制度。', tips: '【交通】高鐵和台鐵便宜且準時。機車租賃便宜。【飲食】夜市小吃便宜美味，必吃珍珠奶茶。【溫泉】北投和宜蘭溫泉著名。【購物】免稅商品在機場。【語言】中文和台語通行。' },
-            'Thailand': { name: '泰國', safety: '大城市相對安全，但要避免偏遠地區和北部邊界。小心扒手和詐騙。', customs: '尊敬國王是最重要的禮儀。不可踩踏國王肖像。進入廟宇要脫鞋並穿著得體。',entry: '台灣護照可享 30-60 天免簽。需要回程機票證明。建議辦理旅遊保險。', tax: '消費稅 7%。外國遊客部分商店可退稅（需消費達要求額度）。', tips: '【交通】嘟嘟車廉價但要議價。BTS 天鐵方便快速。【飲食】辛辣食物居多，告知廚師辣度偏好。飲用清潔水。【文化】3 月-5 月是熱季，容易中暑。【購物】濱河夜市和商場眾多。【語言】英文在觀光區通用。' },
-            'South Korea': { name: '韓國', safety: '非常安全，犯罪率低。晚上外出相對安心。首爾地鐵四通八達。', customs: '尊重年長者，問候時鞠躬。不可在長者面前抽菸或喝酒。',entry: '台灣護照可享 90 天免簽。需展示回程機票。仁川機場提供便利的交通。', tax: '消費稅 10%。外國遊客購物滿額可退稅。退稅需在機場辦理。', tips: '【交通】地鐵便宜且英文標誌清晰。T-money 卡通用於大眾交通。【飲食】燒烤和火鍋人氣高。紅參糖參滋補。【文化】K-pop 文化盛行。【購物】明洞和東大門是購物天堂。【語言】年輕人英文不錯，老年人困難。' },
-            'Singapore': { name: '新加坡', safety: '亞洲最安全城市之一。法律嚴格，執行力強。街道乾淨安全。', customs: '多元文化共存。尊重他人宗教信仰。公共場合安靜。不可隨地吐痰或亂丟垃圾。',entry: '台灣護照可享 30 天免簽。需要回程機票。', tax: '消費稅 9% GST。非居民購物達 100 新幣以上可退稅。', tips: '【交通】MRT 地鐵網路發達，儲值卡便利。出租車貴但安全。【飲食】多國菜系，適合各種口味。【文化】華人為主，普通話通行。【購物】樟宜機場免稅店選擇多。【語言】英文普遍通用。' },
-            'USA': { name: '美國', safety: '大城市治安參差不齊，需謹慎選擇地區。晚上避免獨自外出。使用 Uber 較安全。', customs: '禮儀相對輕鬆。握手是常見問候。小費文化強（通常 15-20%）。',entry: '台灣護照需要 ESTA 或簽證。準備財力證明和行程計畫。', tax: '消費稅各州不同（0-10%）。退稅政策依州而異。', tips: '【交通】自駕為主，大城市有公共交通。Uber 和 Lyft 便利。【飲食】份量大，建議與人共享。【文化】多元社會，尊重不同背景。【購物】名牌折扣店常見。【語言】英文為主，口音多樣。' },
-            'France': { name: '法國', safety: '大城市相對安全，但注意扒手。避免夜間獨自外出。展示警惕意識。', customs: '禮儀講究。見面通常親吻臉頰。不要以「Bonjour」結束談話。尊重法國文化和語言。',entry: '台灣護照在申根區可停留 90 天。需要簽證申請。',tax: '消費稅 20%。非歐盟居民購物達 100 歐元可退稅。', tips: '【交通】火車網路便利，高鐵快速。地鐵在大城市發達。【飲食】品味餐廳文化，不要催促用餐。水要另付費。【文化】咖啡館是社交中心。【購物】香榭麗舍大街是購物天堂。【語言】法文普遍，英文較少。' },
-            'Germany': { name: '德國', safety: '相對安全，但大城市需小心扒手。公共交通準時可靠。', customs: '準時和效率是核心價值。握手時眼神接觸很重要。不要浪費食物。',entry: '台灣護照在申根區可停留 90 天。需簽證。', tax: '消費稅 19%。非歐盟居民消費達 50 歐元可退稅。', tips: '【交通】火車準時，DB 票卡便利。自行車文化流行。【飲食】豬腳和啤酒特色。咖啡館文化發達。【文化】聖誕市集季必訪。【購物】商場和百貨眾多。【語言】年輕人英文不錯。' },
-            'Spain': { name: '西班牙', safety: '觀光區相對安全，但大城市需防扒手。避免深夜獨自外出。', customs: '熱情開放。晚餐時間較遲（20:00 後）。Siesta 習俗仍存。',entry: '台灣護照在申根區停留 90 天。需簽證。', tax: '消費稅 21%。非歐盟居民購物達 90.16 歐元可退稅。', tips: '【交通】地鐵便利，高鐵舒適。巴士便宜。【飲食】海鮮飯和火腿著名。晚餐很晚。【文化】弗拉門戈舞和鬥牛文化。【購物】超市和設計品牌多。【語言】英文在觀光區可用。' },
-            'Italy': { name: '意大利', safety: '觀光區安全，但大城市需警覺扒手。夜間避免獨自外出。', customs: '家庭和朋友關係重要。肢體語言豐富。不要匆促進行。',entry: '台灣護照在申根區停留 90 天。需簽證。', tax: '消費稅 22%。非歐盟居民購物達 155 歐元可退稅。', tips: '【交通】火車方便，地鐵在大城市發達。公車便宜。【飲食】pasta 和披薩多樣。咖啡後才喝牛奶飲品。【文化】藝術和歷史豐富。【購物】設計品牌和古董店。【語言】英文在大城市可用。' },
-            'Australia': { name: '澳大利亞', safety: '相對安全，但需注意野生動物。晚間外出謹慎。', customs: '友善和放鬆。戶外文化強。尊重原住民。',entry: '台灣護照需要電子簽證或簽證。準備足夠資金證明。', tax: '消費稅 10%。非澳大利亞居民購物達 $300 AUD 可退稅。', tips: '【交通】城市公共交通便利。自駕需注意左駕規則。【飲食】咖啡文化發達。BBQ 常見。【文化】海灘文化和戶外運動。【購物】免稅商品在機場。【語言】英文為主，口音獨特。' },
-            'Switzerland': { name: '瑞士', safety: '非常安全，犯罪率極低。是世界上最安全的國家之一。', customs: '尊重隱私，避免大聲喧譁。遵守時間。尊重自然環境。', entry: '台灣護照在申根區可停留 90 天。需要簽證申請。建議購買旅遊保險。', tax: '瑞士無增值稅退稅制度（已包含在價格中）。購物價格全球最高。', tips: '【交通】火車系統發達且準時。購買瑞士通票優惠多。【飲食】奶酪和巧克力著名。飲食昂貴，建議自備食物。【文化】登山和滑雪活動豐富。【購物】手錶和奶酪是必購品。【語言】四種官方語言，英文在觀光區通用。' },
-            'New Zealand': { name: '紐西蘭', safety: '非常安全，犯罪率低。是世界上最安全的旅遊目的地之一。', customs: '友善開放。毛利文化受尊重。戶外運動精神強。', entry: '台灣護照可享 6 個月免簽。需展示回程機票和足夠資金。', tax: '消費稅 15% GST。非紐西蘭居民消費達 $400 NZD 可於機場退稅。', tips: '【交通】景點間距離遠，建議租車自駕。左駕規則。公共交通有限。【飲食】新鮮羊肉和海鮮。咖啡文化發達。【戶外】極限運動首選（跳傘、蹦極）。【文化】毛利文化體驗。【購物】羊毛製品和蜂蜜著名。【語言】英文普遍通用。' }
-        };
-        
-        function escapeStr(str) { return str ? str.replace(/'/g, "\\'").replace(/"/g, '&quot;') : ''; }
         async function copyToClipboard(text) {
             try { await navigator.clipboard.writeText(text); return true; } catch (err) {
                 const textArea = document.createElement("textarea");
@@ -477,51 +395,58 @@
             const urlParams = new URLSearchParams(window.location.search);
             const urlKey = urlParams.get('key');
             if (urlKey) { window.safeStorage.setItem('gemini_api_key', urlKey); window.history.replaceState({}, document.title, window.location.pathname); }
+            
+            // Updated Default Data with Country, Location, and Cost Estimates
             const defaultData = {
                 1: { title: "Day 1: 京都初印象", weather: "晴時多雲 24°C", desc: "體驗古都的寧靜與繁華。", stops: [{ id: 101, time: "上午", name: "清水寺", lat: 34.9948, lng: 135.7850, icon: "fa-torii-gate", desc: "京都最著名的古老寺院。", transport: { mode: "巴士", desc: "京都站搭乘 206 號", price: "230 日圓", duration: "20 分", steps: ["前往京都站 D2 乘車處", "搭乘 206 號公車", "五條坂下車"] }, tips: "早點去避開人潮。", tags: ["古蹟"] }] }
             };
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('aiStartDate').value = today;
-            const defaultMeta = { currency: "1 TWD ≈ 4.7 JPY", weather_summary: "平均 24°C", startDate: today };
+            // Added country, main_location, and estimated_costs
+            const defaultMeta = { 
+                currency: "1 TWD ≈ 4.7 JPY", 
+                weather_summary: "平均 24°C", 
+                startDate: today,
+                country: "Japan",
+                main_location: "日本, 京都",
+                estimated_costs: {
+                    accommodation: 40000,
+                    transport: 5000,
+                    food: 12000,
+                    total: 57000,
+                    currency: "JPY"
+                }
+            };
             loadItineraryFromHistory(defaultData, defaultMeta, null);
             
-            // 【優化】API Key 持久化檢查 - 延遲執行確保 DOM 準備就緒
             setTimeout(() => {
                 const savedKey = window.safeStorage.getItem('gemini_api_key') || envApiKey;
-                if(savedKey) {
-                    window.updateAPIKeyStatus(true);
-                }
+                if(savedKey) window.updateAPIKeyStatus(true);
             }, 100);
         };
         
-        // 【新增】更新 API Key 按鈕狀態
         window.updateAPIKeyStatus = (isConnected) => {
             const statusText = document.getElementById('keyStatusText');
             const icon = document.querySelector('#settingsBtn i');
             const btn = document.getElementById('settingsBtn');
+            const btnMobile = document.getElementById('settingsBtnMobile');
             
             if(isConnected) {
                 if(statusText) statusText.innerText = "已連結 AI";
                 if(icon) icon.className = "fa-solid fa-check text-green-400";
-                if(btn) {
-                    btn.classList.add('bg-green-500/10', 'border-green-400/30');
-                    btn.classList.remove('bg-white/10', 'border-white/20');
-                }
+                const activeClasses = ['bg-green-500/10', 'border-green-400/30'];
+                const inactiveClasses = ['bg-white/10', 'border-white/20'];
+                if(btn) { btn.classList.add(...activeClasses); btn.classList.remove(...inactiveClasses); }
+                if(btnMobile) { btnMobile.classList.add(...activeClasses); btnMobile.classList.remove(...inactiveClasses); }
             } else {
                 if(statusText) statusText.innerText = "連結 AI";
                 if(icon) icon.className = "fa-solid fa-link text-base";
-                if(btn) {
-                    btn.classList.remove('bg-green-500/10', 'border-green-400/30');
-                    btn.classList.add('bg-white/10', 'border-white/20');
-                }
             }
         };
 
         function initMap() {
-            // Make synchronous immediately
             map = L.map('map', { zoomControl: false }).setView([34.9948, 135.7850], 13);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 20 }).addTo(map);
-            // Delay invalidate for layout to settle
             setTimeout(() => { map.invalidateSize(); }, 200);
         }
         
@@ -539,7 +464,6 @@
             window.currentDocId = docId; 
             updateHeader(meta);
             renderTabs();
-            // Check for Summary View Request or Default
             const days = Object.keys(data);
             if(days.length > 0) switchDay(days[0]);
             isEditMode = false; updateEditUI();
@@ -550,25 +474,21 @@
             const currencyEl = document.getElementById('headerCurrency');
             if(meta && meta.currency) currencyEl.innerText = meta.currency;
             else currencyEl.innerText = '匯率未知';
+            
+            // Location removed from header logic
         }
 
-        // 【新增】OpenWeatherMap 天氣查詢功能
         window.fetchWeatherData = async (lat, lng, dayIndex) => {
-            if (!OPENWEATHER_API_KEY) {
-                console.log("OpenWeatherMap API Key 未設定");
-                return null;
-            }
-            
-            const cacheKey = `${lat},${lng}`;
+            if (!OPENWEATHER_API_KEY) return null;
+            const cacheKey = `${lat},${lng},${dayIndex}`; // Include dayIndex to avoid stale cache for same location different days if needed, but forecast is time based.
             if (weatherCache[cacheKey]) return weatherCache[cacheKey];
             
             try {
                 const response = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lng}&units=metric&lang=zh_tw&appid=${OPENWEATHER_API_KEY}`);
                 if (!response.ok) throw new Error('天氣API查詢失敗');
-                
                 const data = await response.json();
-                weatherCache[cacheKey] = data;
-                return data;
+                // We cache the raw response.
+                return data; 
             } catch (error) {
                 console.error('天氣查詢錯誤:', error);
                 return null;
@@ -579,105 +499,76 @@
             const weatherData = await window.fetchWeatherData(lat, lng, dayIndex);
             if (!weatherData) return null;
             
-            // 取得該天的天氣預報
             const list = weatherData.list;
-            const today = new Date().toISOString().split('T')[0];
             const targetDate = new Date();
-            targetDate.setDate(targetDate.getDate() + dayIndex - 1);
-            const targetDateStr = targetDate.toISOString().split('T')[0];
-            
-            const dayForecasts = list.filter(item => item.dt_txt.startsWith(targetDateStr));
-            if (dayForecasts.length === 0) return null;
-            
-            // 計算詳細天氣數據
-            const temps = dayForecasts.map(f => f.main.temp);
-            const avgTemp = Math.round(temps.reduce((a, b) => a + b, 0) / temps.length);
-            const minTemp = Math.min(...temps);
-            const maxTemp = Math.max(...temps);
-            const weather = dayForecasts[0].weather[0];
-            
-            // 新增詳細字段
-            const humidity = dayForecasts[0].main.humidity;
-            const windSpeed = dayForecasts[0].wind.speed;
-            const feelsLike = Math.round(dayForecasts[0].main.feels_like);
-            const precipitation = dayForecasts.reduce((sum, f) => sum + (f.rain?.['3h'] || 0), 0);
-            const uvIndex = dayForecasts[0].uvi || 'N/A';
-            
-            // 計算穿衣建議
-            const clothingSuggestion = window.getClothingSuggestion(avgTemp, weather.main, humidity, windSpeed);
-            
-            return {
-                temp: avgTemp,
-                minTemp: minTemp,
-                maxTemp: maxTemp,
-                feelsLike: feelsLike,
-                description: weather.main,
-                icon: weather.icon,
-                humidity: humidity,
-                windSpeed: windSpeed,
-                precipitation: precipitation,
-                uvIndex: uvIndex,
-                clothingSuggestion: clothingSuggestion
-            };
-        };
-        
-        // 新增：根據天氣情況生成穿衣建議
-        window.getClothingSuggestion = (temp, weatherType, humidity, windSpeed) => {
-            const suggestions = [];
-            
-            // 溫度判斷
-            if (temp < 0) {
-                suggestions.push('❄️ 極寒：穿厚羽絨服、發熱衣、毛帽、圍巾和手套。');
-                suggestions.push('👢 建議穿防滑雪靴。');
-            } else if (temp < 10) {
-                suggestions.push('🧥 寒冷：穿厚外套、毛衣。');
-                suggestions.push('🧣 建議配戴圍巾和手套。');
-                suggestions.push('👖 穿著保暖長褲。');
-            } else if (temp < 15) {
-                suggestions.push('🧥 涼爽：薄夾克或衛衣即可。');
-                suggestions.push('👖 搭配長褲。');
-            } else if (temp < 20) {
-                suggestions.push('👕 長袖 T 恤或薄襯衫。');
-                suggestions.push('🧥 早晚可能偏涼，建議帶件薄外套。');
-            } else if (temp < 25) {
-                suggestions.push('👕 短袖 T 恤。');
-                suggestions.push('👖 可穿薄長褲或短褲。');
-                suggestions.push('🕶️ 陽光好，可戴太陽眼鏡。');
+            // Assuming Day 1 is "Today" or Metadata Start Date
+            if(window.currentMetaData && window.currentMetaData.startDate) {
+                const start = new Date(window.currentMetaData.startDate);
+                targetDate.setTime(start.getTime() + (dayIndex - 1) * 86400000);
             } else {
-                suggestions.push('👕 炎熱：穿輕薄短袖、透氣材質的衣物。');
-                suggestions.push('👖 短褲或涼感褲。');
-                suggestions.push('☀️ 務必注意防曬，擦防曬乳、戴帽。');
-            }
-            
-            // 天氣類型調整
-            const lowerCaseWeather = weatherType.toLowerCase();
-            if (lowerCaseWeather.includes('rain') || lowerCaseWeather.includes('drizzle')) {
-                suggestions.push('☔️ 有雨：記得攜帶雨傘或雨衣。');
-                suggestions.push('👟 建議穿防水的鞋子。');
-            }
-            if (lowerCaseWeather.includes('snow')) {
-                suggestions.push('❄️ 下雪：穿防水外套和雪靴。');
-                suggestions.push('🧤 手套和毛帽是必需品。');
-            }
-            if (lowerCaseWeather.includes('clear') && temp > 15) {
-                suggestions.push('☀️ 晴天紫外線強，注意防曬。');
-            }
-            
-            // 濕度提醒
-            if (humidity > 80 && temp > 20) {
-                suggestions.push('💧 濕熱：選擇吸濕排汗的衣物。');
-            }
-            
-            // 風速提醒
-            if (windSpeed > 10) { // m/s
-                suggestions.push('💨 風大：建議穿防風外套。');
+                targetDate.setDate(targetDate.getDate() + dayIndex - 1);
             }
 
-            if (suggestions.length === 0) {
-                suggestions.push('白天溫差大，建議洋蔥式穿搭。');
+            const targetDateStr = targetDate.toISOString().split('T')[0];
+            const dayForecasts = list.filter(item => item.dt_txt.startsWith(targetDateStr));
+            
+            let result = {};
+            let isRef = false;
+
+            if (dayForecasts.length === 0) {
+                 // Fallback to first available data (Current/Soonest)
+                 const current = list[0];
+                 if(!current) return null; // Should not happen if API worked
+                 isRef = true;
+                 
+                 result = {
+                    temp: Math.round(current.main.temp),
+                    minTemp: current.main.temp_min,
+                    maxTemp: current.main.temp_max,
+                    feelsLike: Math.round(current.main.feels_like),
+                    description: current.weather[0].main,
+                    icon: current.weather[0].icon,
+                    humidity: current.main.humidity,
+                    windSpeed: current.wind.speed,
+                    precipitation: (current.rain && current.rain['3h']) || 0,
+                    locationName: weatherData.city ? weatherData.city.name : "此地",
+                    isReference: true
+                 };
+            } else {
+                const temps = dayForecasts.map(f => f.main.temp);
+                const avgTemp = Math.round(temps.reduce((a, b) => a + b, 0) / temps.length);
+                const minTemp = Math.min(...temps);
+                const maxTemp = Math.max(...temps);
+                const weather = dayForecasts[0].weather[0];
+                const humidity = dayForecasts[0].main.humidity;
+                const windSpeed = dayForecasts[0].wind.speed;
+                const feelsLike = Math.round(dayForecasts[0].main.feels_like);
+                const precipitation = dayForecasts.reduce((sum, f) => sum + (f.rain?.['3h'] || 0), 0);
+                
+                result = {
+                    temp: avgTemp,
+                    minTemp: minTemp,
+                    maxTemp: maxTemp,
+                    feelsLike: feelsLike,
+                    description: weather.main,
+                    icon: weather.icon,
+                    humidity: humidity,
+                    windSpeed: windSpeed,
+                    precipitation: precipitation,
+                    locationName: weatherData.city ? weatherData.city.name : "此地",
+                    isReference: false
+                };
             }
             
-            return suggestions;
+            return result;
+        };
+        
+        window.getClothingSuggestion = (temp, weatherType) => {
+             // Simple Clothing Logic
+             if(temp < 10) return "🧥 寒冷：穿厚外套、圍巾";
+             if(temp < 20) return "👕 涼爽：薄外套、長袖";
+             if(temp < 28) return "👚 舒適：短袖、薄長褲";
+             return "☀️ 炎熱：透氣衣物、防曬";
         };
 
         window.toggleEditMode = () => { if (isEditMode) saveEdits(); isEditMode = !isEditMode; updateEditUI(); };
@@ -697,8 +588,7 @@
         }
 
         function saveEdits() {
-            if(currentDay === 'summary') return; // No edit in summary
-            
+            if(currentDay === 'summary') return;
             const dayData = window.currentItineraryData[currentDay];
             if (!dayData) return;
             const titleEl = document.getElementById('dayTitle');
@@ -708,13 +598,8 @@
             dayData.stops.forEach(stop => {
                 const nameEl = document.getElementById(`stop-name-${stop.id}`);
                 const descEl = document.getElementById(`stop-desc-${stop.id}`);
-                const transDescEl = document.getElementById(`stop-trans-desc-${stop.id}`);
                 if(nameEl) stop.name = nameEl.innerText;
                 if(descEl) stop.desc = descEl.innerText;
-                if(transDescEl && stop.transport) {
-                    if(typeof stop.transport === 'string') stop.transport = transDescEl.innerText;
-                    else stop.transport.desc = transDescEl.innerText;
-                }
             });
             window.saveCurrentItinerary();
         }
@@ -733,6 +618,24 @@
                     const newStr = `1 ${target} ≈ ${newRate} ${source}`;
                     window.currentMetaData.currency = newStr;
                     updateHeader(window.currentMetaData);
+
+                    // Update Estimated Costs Logic
+                    if (window.currentMetaData.estimated_costs) {
+                        const costs = window.currentMetaData.estimated_costs;
+                        const factor = 1 / rate;
+                        costs.accommodation = Math.round(costs.accommodation * factor);
+                        costs.transport = Math.round(costs.transport * factor);
+                        costs.food = Math.round(costs.food * factor);
+                        costs.total = Math.round(costs.total * factor);
+                        costs.currency = source;
+                    }
+
+                    // Refresh Summary if active
+                    if (currentDay === 'summary') {
+                         const container = document.getElementById('contentList');
+                         container.innerHTML = '';
+                         renderSummaryView(container);
+                    }
                 }
             }
         };
@@ -743,164 +646,113 @@
             if(key) {
                 window.safeStorage.setItem('gemini_api_key', key);
                 window.showToast("API Key 已儲存");
-                
-                // Safe UI updates
-                const statusText = document.getElementById('keyStatusText');
-                if(statusText) statusText.innerText = "已連結 AI";
-                
-                const icon = document.querySelector('#settingsBtn i');
-                if(icon) icon.className = "fa-solid fa-check text-green-400";
-                
-                const btn = document.getElementById('settingsBtn');
-                if(btn) btn.classList.add('bg-green-500/10', 'border-green-400/30');
-
+                window.updateAPIKeyStatus(true);
                 window.closeModal('settingsModal');
-            } else {
-                alert("請輸入有效的 API Key");
-            }
+            } else { alert("請輸入有效的 API Key"); }
         };
         window.useDemoMode = () => { window.closeModal('settingsModal'); window.runMockGeneration(); };
         window.pasteApiKey = async () => { try { const text = await navigator.clipboard.readText(); document.getElementById('settingsApiKey').value = text; } catch (err) { alert('無法讀取剪貼簿，請手動貼上'); } };
 
         window.openShareModal = () => document.getElementById('shareModal').classList.remove('hidden');
-        window.toggleIosGuide = () => { const guide = document.getElementById('iosGuide'); const arrow = document.getElementById('iosGuideArrow'); if (guide.classList.contains('hidden')) { guide.classList.remove('hidden'); arrow.classList.add('rotate-180'); } else { guide.classList.add('hidden'); arrow.classList.remove('rotate-180'); } };
-        
-        window.copyWebLink = async () => {
-            const url = "https://fluffy-dragon-1a2b3c.netlify.app/";
-            const success = await window.copyToClipboard(url);
-            if (success) alert("連結已複製！\n\n您可以將此連結貼給朋友，或在 Safari 中開啟。"); else alert("複製失敗");
-        };
+        window.copyWebLink = async () => { const success = await window.copyToClipboard("https://heartfelt-crumble-323cc4.netlify.app/"); if (success) alert("連結已複製！"); else alert("複製失敗"); };
         window.shareAsCode = async () => {
             if (!window.currentItineraryData) return alert("無行程可分享");
             const jsonStr = JSON.stringify({ data: window.currentItineraryData, meta: window.currentMetaData });
-            // 使用 LZ 字符串壓縮以減少代碼長度
             const compressed = LZString.compressToBase64(jsonStr);
             const success = await window.copyToClipboard(compressed);
-            if (success) { alert("行程資料碼已複製！\n\n壓縮後長度：" + compressed.length + " 字符\n\n原始長度：" + jsonStr.length + " 字符\n壓縮率：" + (100 - Math.round(compressed.length / jsonStr.length * 100)) + "%\n\n請將此代碼貼給您的朋友，他們即可使用「匯入」功能讀取行程。"); window.closeModal('shareModal'); } else { alert("複製失敗，請手動複製"); }
+            if (success) { alert("行程資料碼已複製！(已壓縮)"); window.closeModal('shareModal'); } else { alert("複製失敗"); }
         };
         
         window.importItinerary = () => {
-            const code = prompt("請貼上朋友分享的「行程資料碼」：");
-            if (!code) return;
+            const code = prompt("請貼上行程資料碼："); if (!code) return;
             try {
-                // 嘗試解壓 LZ 字符串格式
                 let jsonStr = '';
-                try {
-                    jsonStr = LZString.decompressFromBase64(code);
-                } catch (e) {
-                    // 回退到舊格式（純 Base64）
-                    jsonStr = decodeURIComponent(escape(atob(code)));
-                }
-                
+                try { jsonStr = LZString.decompressFromBase64(code); } catch (e) { jsonStr = decodeURIComponent(escape(atob(code))); }
                 if (!jsonStr) throw new Error("解壓失敗");
-                
                 const shared = JSON.parse(jsonStr);
-                if (shared && shared.data) { window.loadItineraryFromHistory(shared.data, shared.meta, null); window.saveCurrentItinerary(); window.closeModal('historyModal'); alert("行程匯入成功！"); } else { alert("無效的行程碼格式"); }
-            } catch (e) { console.error(e); alert("匯入失敗：代碼錯誤或格式不支援。\n\n錯誤：" + e.message); }
+                if (shared && shared.data) { window.loadItineraryFromHistory(shared.data, shared.meta, null); window.saveCurrentItinerary(); window.closeModal('historyModal'); alert("行程匯入成功！"); } else { alert("無效的行程碼"); }
+            } catch (e) { alert("匯入失敗"); }
         };
         window.shareToLine = () => {
             const data = window.currentItineraryData; const meta = window.currentMetaData; if (!data) return;
-            let text = `✈️ 我的旅遊行程：${meta.startDate || '未定日期'}\n`;
-            Object.keys(data).forEach(day => { text += `\n【Day ${day}】${data[day].title.replace(/Day \d+:/,'').trim()}\n`; data[day].stops.forEach((stop,idx) => { text += `${idx+1}. ${stop.name}\n`; }); });
+            let text = `✈️ ${meta.main_location || meta.country || '旅遊'}行程：${meta.startDate || ''}\n`;
+            Object.keys(data).forEach(day => { text += `\n【Day ${day}】\n`; data[day].stops.forEach((stop,idx) => { text += `${idx+1}. ${stop.name}\n`; }); });
             window.open('https://line.me/R/msg/text/?' + encodeURIComponent(text));
         };
-        window.copyItineraryText = async () => { const data = window.currentItineraryData; const meta = window.currentMetaData; if (!data) return; let text = `✈️ 我的旅遊行程：${meta.startDate || '未定日期'}\n`; Object.keys(data).forEach(day => { text += `\n【Day ${day}】${data[day].title.replace(/Day \d+:/,'').trim()}\n`; data[day].stops.forEach((stop,idx) => { text += `${idx+1}. ${stop.name}\n`; }); }); const success = await window.copyToClipboard(text); if(success) window.showToast("已複製！"); else alert("複製失敗"); };
 
+        // Weather with Location Accuracy
         window.openWeatherModal = async () => {
             const list = document.getElementById('weatherList'); 
             list.innerHTML = '<div class="text-center text-slate-400 mt-10">載入中...</div>'; 
             if(!window.currentItineraryData) return;
             
-            // 獲取第一個行程地點的坐標用於天氣查詢
-            let lat, lng;
+            list.innerHTML = '';
+            let dayIndex = 1;
+            
+            // Iterate through days and use the first stop location for each day
             for (let dayKey of Object.keys(window.currentItineraryData)) {
                 const day = window.currentItineraryData[dayKey];
+                let lat, lng;
+                
+                // Get location for THIS day
                 if (day.stops && day.stops.length > 0) {
                     lat = day.stops[0].lat;
                     lng = day.stops[0].lng;
-                    break;
                 }
-            }
-            
-            if (!lat || !lng) {
-                // 如果沒有地點，顯示靜態數據
-                list.innerHTML = '';
-                Object.keys(window.currentItineraryData).forEach(dayKey => {
-                    const day = window.currentItineraryData[dayKey];
-                    const weatherText = day.weather || "未知";
-                    let iconClass = "fa-cloud";
-                    if(weatherText.includes("晴")) iconClass = "fa-sun text-yellow-500";
-                    else if(weatherText.includes("雨")) iconClass = "fa-umbrella text-blue-500";
-                    const displayDate = getDisplayDate(dayKey);
-                    const item = document.createElement('div');
-                    item.className = "bg-white p-4 rounded-xl border border-orange-100 shadow-sm flex items-center justify-between";
-                    item.innerHTML = `<div><span class="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded">${displayDate}</span></div><div class="flex items-center gap-2"><i class="fa-solid ${iconClass} text-xl"></i><span class="text-sm font-medium text-slate-600">${weatherText}</span></div>`;
-                    list.appendChild(item);
-                });
-                document.getElementById('weatherModal').classList.remove('hidden');
-                return;
-            }
-            
-            // 獲取實時天氣數據
-            list.innerHTML = '';
-            let dayIndex = 1;
-            for (let dayKey of Object.keys(window.currentItineraryData)) {
-                const day = window.currentItineraryData[dayKey];
-                const weatherData = await window.getWeatherForDay(lat, lng, dayIndex);
+                
                 const displayDate = getDisplayDate(dayKey);
-                
                 const item = document.createElement('div');
-                item.className = "bg-white p-4 rounded-xl border border-orange-100 shadow-sm flex items-center justify-between";
+                item.className = "bg-white p-4 rounded-xl border border-orange-100 shadow-sm flex flex-col gap-2";
                 
-                if (weatherData) {
-                    let iconClass = "fa-cloud";
-                    if (weatherData.description.includes("Clear") || weatherData.description.includes("Sunny")) iconClass = "fa-sun text-yellow-500";
-                    else if (weatherData.description.includes("Rain")) iconClass = "fa-umbrella text-blue-500";
-                    else if (weatherData.description.includes("Cloud")) iconClass = "fa-cloud text-slate-400";
-                    
-                    // 構建詳細天氣信息
-                    const clothingHtml = weatherData.clothingSuggestion 
-                        ? `<div class="mt-3 pt-3 border-t border-orange-100">
-                            <div class="text-xs font-bold text-orange-600 mb-2">👕 穿衣建議：</div>
-                            <div class="text-xs text-slate-600 space-y-1">
-                                ${weatherData.clothingSuggestion.map(s => `<div>• ${s}</div>`).join('')}
+                if (lat && lng) {
+                    const weatherData = await window.getWeatherForDay(lat, lng, dayIndex);
+                    if (weatherData) {
+                        let iconClass = "fa-cloud";
+                        if (weatherData.description.includes("Clear") || weatherData.description.includes("Sunny")) iconClass = "fa-sun text-yellow-500";
+                        else if (weatherData.description.includes("Rain")) iconClass = "fa-umbrella text-blue-500";
+                        
+                        const suggestion = window.getClothingSuggestion(weatherData.temp, weatherData.description);
+                        
+                        let dateBadge = `<span class="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded">${displayDate}</span>`;
+                        let refBadge = "";
+                        if (weatherData.isReference) {
+                            refBadge = `<div class="text-[10px] text-slate-400 mt-1"><i class="fa-solid fa-circle-info"></i> 無預報資料 (參考當地目前天氣)</div>`;
+                        }
+
+                        item.innerHTML = `
+                            <div class="flex flex-col mb-2">
+                                <div class="flex justify-between items-center">
+                                    ${dateBadge}
+                                    <span class="text-xs text-slate-400"><i class="fa-solid fa-location-dot"></i> ${weatherData.locationName}</span>
+                                </div>
+                                ${refBadge}
                             </div>
-                          </div>`
-                        : '';
-                    
-                    item.innerHTML = `<div class="w-full">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded">${displayDate}</span>
-                            <i class="fa-solid ${iconClass} text-lg"></i>
-                        </div>
-                        <div class="text-sm font-semibold text-slate-800 mb-2">${weatherData.description}</div>
-                        
-                        <div class="grid grid-cols-2 gap-2 text-xs text-slate-600 mb-2">
-                            <div>🌡️ 平均: ${weatherData.temp}°C</div>
-                            <div>📊 體感: ${weatherData.feelsLike}°C</div>
-                            <div>🔼 高: ${weatherData.maxTemp.toFixed(1)}°C</div>
-                            <div>🔽 低: ${weatherData.minTemp.toFixed(1)}°C</div>
-                            <div>💧 濕度: ${weatherData.humidity}%</div>
-                            <div>💨 風速: ${weatherData.windSpeed.toFixed(1)} m/s</div>
-                            ${weatherData.precipitation > 0 ? `<div>🌧️ 降水: ${weatherData.precipitation.toFixed(1)}mm</div>` : ''}
-                        </div>
-                        
-                        ${clothingHtml}
-                    </div>`;
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid ${iconClass} text-2xl"></i>
+                                    <div>
+                                        <div class="text-lg font-bold text-slate-800">${weatherData.temp}°C</div>
+                                        <div class="text-xs text-slate-500">${weatherData.description}</div>
+                                    </div>
+                                </div>
+                                <div class="text-right text-xs text-slate-500">
+                                    <div>濕度 ${weatherData.humidity}%</div>
+                                    <div>降水 ${weatherData.precipitation.toFixed(1)}mm</div>
+                                </div>
+                            </div>
+                            <div class="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">${suggestion}</div>
+                        `;
+                    } else {
+                        item.innerHTML = `<div class="flex justify-between"><span class="text-xs font-bold text-orange-500">${displayDate}</span><span class="text-xs text-slate-400">無預報資料</span></div>`;
+                    }
                 } else {
-                    const weatherText = day.weather || "未知";
-                    let iconClass = "fa-cloud";
-                    if(weatherText.includes("晴")) iconClass = "fa-sun text-yellow-500";
-                    else if(weatherText.includes("雨")) iconClass = "fa-umbrella text-blue-500";
-                    item.innerHTML = `<div><span class="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded">${displayDate}</span></div><div class="flex items-center gap-2"><i class="fa-solid ${iconClass} text-xl"></i><span class="text-sm font-medium text-slate-600">${weatherText}</span></div>`;
+                     item.innerHTML = `<div class="flex justify-between"><span class="text-xs font-bold text-orange-500">${displayDate}</span><span class="text-xs text-slate-400">無地點資料</span></div>`;
                 }
-                
                 list.appendChild(item);
                 dayIndex++;
             }
             document.getElementById('weatherModal').classList.remove('hidden');
         };
-        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
 
         function getDisplayDate(dayIndex) {
             if (!window.currentMetaData || !window.currentMetaData.startDate) return `Day ${dayIndex}`;
@@ -913,33 +765,36 @@
         function renderTabs() {
             const container = document.getElementById('dayTabsContainer'); container.innerHTML = '';
             
-            // Add Summary Tab
             const summaryBtn = document.createElement('button');
             summaryBtn.className = `day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all text-xs font-bold ${currentDay == 'summary' ? 'bg-sky-500 text-white shadow-md' : 'bg-slate-100 text-slate-600'}`;
             summaryBtn.dataset.day = 'summary';
             summaryBtn.onclick = () => switchDay('summary');
-            summaryBtn.innerHTML = `<i class="fa-solid fa-map"></i><br><span class="text-[12px]">總覽</span>`;
+            summaryBtn.innerHTML = `<i class="fa-solid fa-chart-pie mb-1"></i><br><span class="text-[12px]">總覽與預算</span>`;
             container.appendChild(summaryBtn);
 
             Object.keys(window.currentItineraryData).forEach(day => {
                 const btn = document.createElement('button');
                 btn.className = `day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all text-xs font-bold ${day == currentDay ? 'bg-sky-500 text-white shadow-md' : 'bg-slate-100 text-slate-600'}`;
                 btn.dataset.day = day; btn.onclick = () => switchDay(day);
-                const dateStr = getDisplayDate(day);
-                btn.innerHTML = `${dateStr}<br><span class="font-normal opacity-80 text-[12px] truncate block px-1">查看</span>`;
+                // Modified: Add location to Day tab
+                const locationText = window.currentMetaData.main_location ? window.currentMetaData.main_location.split(',')[1] || window.currentMetaData.main_location : (window.currentMetaData.country || '行程');
+                btn.innerHTML = `${getDisplayDate(day)}<br><span class="font-normal opacity-80 text-[10px] truncate block px-1">${locationText}</span>`;
                 container.appendChild(btn);
             });
             const tipsBtn = document.createElement('button');
             tipsBtn.className = "day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all bg-yellow-50 text-yellow-700 hover:bg-yellow-100 text-xs font-bold border border-yellow-200";
-            tipsBtn.onclick = () => renderTips(); tipsBtn.innerHTML = `<i class="fa-regular fa-lightbulb text-lg mb-1"></i><br><span class="text-[12px]">貼心提示</span>`;
+            tipsBtn.onclick = () => renderTips(); tipsBtn.innerHTML = `<i class="fa-regular fa-lightbulb text-lg mb-1"></i><br><span class="text-[12px]">AI 提示</span>`;
             container.appendChild(tipsBtn);
         }
 
         function switchDay(day) {
             currentDay = day;
             document.querySelectorAll('.day-btn').forEach(btn => {
+                const isSummary = btn.innerHTML.includes('總覽');
+                const isTips = btn.innerHTML.includes('AI 提示');
+                
                 if (btn.dataset.day == day) btn.className = "day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all text-xs font-bold bg-sky-500 text-white shadow-md";
-                else if(btn.innerHTML.includes('貼心提示')) btn.className = "day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all bg-yellow-50 text-yellow-700 hover:bg-yellow-100 text-xs font-bold border border-yellow-200";
+                else if(isTips) btn.className = "day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all bg-yellow-50 text-yellow-700 hover:bg-yellow-100 text-xs font-bold border border-yellow-200";
                 else btn.className = "day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all text-xs font-bold bg-slate-100 text-slate-600";
             });
             
@@ -947,84 +802,15 @@
             for (let id in markers) map.removeLayer(markers[id]); markers = {};
             if (currentPolyline) { map.removeLayer(currentPolyline); currentPolyline = null; }
             
-            // SUMMARY VIEW LOGIC
             if (day === 'summary') {
-                // Header
-                const header = document.createElement('div'); header.className = "mb-4";
-                header.innerHTML = `<div class="flex items-center gap-2"><h2 class="text-2xl font-bold text-sky-900">🗓️ 行程總覽</h2></div><p class="text-sm text-slate-500 mt-1">全地圖檢視模式 (依序標示)</p>`;
-                container.appendChild(header);
-
-                const bounds = [];
-                const allRouteCoords = [];
-                let globalStopIndex = 1;
-
-                Object.keys(window.currentItineraryData).forEach(dayKey => {
-                    const dayData = window.currentItineraryData[dayKey];
-                    const dayDate = getDisplayDate(dayKey);
-                    
-                    // Day Group Header in List
-                    const dayHeader = document.createElement('div');
-                    dayHeader.className = "sticky top-0 bg-sky-50/90 backdrop-blur px-3 py-2 rounded-lg font-bold text-sky-800 text-sm border border-sky-100 z-10 mb-2 shadow-sm";
-                    dayHeader.innerHTML = `${dayDate} - ${dayData.title.replace(/Day \d+:/,'').trim()}`;
-                    container.appendChild(dayHeader);
-
-                    dayData.stops.forEach((stop) => {
-                        const lat = parseFloat(stop.lat); const lng = parseFloat(stop.lng);
-                        if (!isNaN(lat) && !isNaN(lng)) {
-                            allRouteCoords.push([lat, lng]);
-                            bounds.push([lat, lng]);
-
-                            // List Item (Compact)
-                            const item = document.createElement('div');
-                            item.className = "flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100 mb-2";
-                            item.innerHTML = `
-                                <div class="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shadow-sm shrink-0">${globalStopIndex}</div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="font-bold text-slate-800 text-sm truncate">${stop.name}</div>
-                                    <div class="text-xs text-slate-500 truncate"><i class="fa-regular fa-clock mr-1"></i>${stop.time}</div>
-                                </div>
-                            `;
-                            item.onclick = () => {
-                                 switchDay(dayKey);
-                                 focusLocation(lat, lng);
-                             };
-                            container.appendChild(item);
-
-                            // Map Marker (Numbered)
-                            const numberIcon = L.divIcon({
-                                className: 'custom-number-icon',
-                                html: `<div class="number-icon">${globalStopIndex}</div>`,
-                                iconSize: [30, 30],
-                                iconAnchor: [15, 15]
-                            });
-                            const marker = L.marker([lat, lng], { icon: numberIcon }).addTo(map).bindPopup(`<b>${globalStopIndex}. ${stop.name}</b><br>${dayDate}`);
-                            marker.on('click', () => focusLocation(lat, lng));
-                            markers[stop.id || Math.random()] = marker;
-                            
-                            globalStopIndex++;
-                        }
-                    });
-                });
-
-                // Draw Full Route
-                if (allRouteCoords.length > 1) {
-                    currentPolyline = L.polyline(allRouteCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '6, 6' }).addTo(map);
-                }
-
-                if (bounds.length > 0) {
-                    currentBounds = bounds;
-                    setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50] }); }, 200);
-                }
-                return; // Exit summary view logic
+                renderSummaryView(container);
+                return;
             }
 
-            // DAILY VIEW LOGIC (Existing)
+            // Daily View
             const dayData = window.currentItineraryData[day]; if (!dayData) return;
-            const headerWeatherEl = document.getElementById('headerWeather');
-            if (dayData.weather) headerWeatherEl.innerText = dayData.weather; else headerWeatherEl.innerText = "--";
-
             const header = document.createElement('div'); header.className = "mb-4";
-            header.innerHTML = `<div class="flex items-center flex-wrap gap-y-1"><h2 id="dayTitle" data-editable class="text-xl font-bold text-sky-900 mr-2 outline-none rounded px-1 -ml-1 border border-transparent transition-all">${dayData.title}</h2>${dayData.weather ? `<span class="ml-2 inline-flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full border border-orange-200"><i class="fa-solid fa-sun"></i> ${dayData.weather}</span>` : ''}</div><p id="dayDesc" data-editable class="text-sm text-slate-500 mt-1 outline-none rounded px-1 -ml-1 border border-transparent transition-all">${dayData.desc}</p>`;
+            header.innerHTML = `<div class="flex items-center flex-wrap gap-y-1"><h2 id="dayTitle" data-editable class="text-xl font-bold text-sky-900 mr-2 outline-none rounded px-1 -ml-1 border border-transparent transition-all">${dayData.title}</h2></div><p id="dayDesc" data-editable class="text-sm text-slate-500 mt-1 outline-none rounded px-1 -ml-1 border border-transparent transition-all">${dayData.desc}</p>`;
             container.appendChild(header);
             
             const bounds = []; const routeCoords = [];
@@ -1034,13 +820,16 @@
                 if (!isNaN(lat) && !isNaN(lng)) routeCoords.push([lat, lng]);
                 const card = document.createElement('div');
                 card.className = "card-hover bg-white rounded-xl p-4 border border-slate-200 cursor-pointer transition-all relative overflow-hidden group";
-                card.onclick = (e) => { if(isEditMode) return; focusLocation(lat, lng); };
+                card.onclick = () => { if(isEditMode) return; focusLocation(lat, lng); };
                 let transportHtml = '';
                 if (stop.transport) {
                    const trans = typeof stop.transport === 'string' ? stop.transport : stop.transport.desc;
                    transportHtml = `<div class="mt-2 text-xs bg-sky-50 p-1 rounded text-sky-600"><i class="fa-solid fa-train"></i> <span id="stop-trans-desc-${stop.id}" data-editable>${trans}</span></div>`;
                 }
-                                 card.innerHTML = `<div class="relative"><div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">${index > 0 ? `<button onclick="window.moveStopUp(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="上移"><i class="fa-solid fa-arrow-up"></i></button>` : ''}${index < dayData.stops.length - 1 ? `<button onclick="window.moveStopDown(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="下移"><i class="fa-solid fa-arrow-down"></i></button>` : ''}<button onclick="window.deleteStop(${day}, ${index}); event.stopPropagation();" class="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded text-xs" title="刪除"><i class="fa-solid fa-trash"></i></button></div><div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 group-hover:bg-sky-500 group-hover:text-white transition-colors z-10"><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i></div>${!isLast ? '<div class="w-0.5 h-full bg-slate-100 my-1"></div>' : ''}</div><div class="flex-1 pb-2"><div class="flex justify-between items-start mb-1"><span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">${stop.time}</span><div class="flex gap-1">${(stop.tags || []).map(t => `<span class="text-[10px] text-sky-500 bg-sky-50 px-1.5 rounded">${t}</span>`).join('')}</div></div><h3 class="text-lg font-bold text-slate-800 mb-1 group-hover:text-sky-600 outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-name-${stop.id}" data-editable>${stop.name}</h3><p class="text-sm text-slate-600 leading-relaxed outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-desc-${stop.id}" data-editable>${stop.desc}</p>${transportHtml}<div class="mt-2 text-xs flex gap-2"><button onclick="window.open('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.name)}&query_place_id=${lat},${lng}', '_blank'); event.stopPropagation();" class="bg-slate-100 hover:bg-green-100 text-slate-600 hover:text-green-700 px-2 py-1 rounded transition-colors"><i class="fa-solid fa-location-arrow"></i> 導航</button></div></div></div></div>`;
+                // Modified: Added Location Badge inside card
+                const locationBadge = `<div class="text-[10px] text-slate-400 mb-1 flex items-center gap-1"><i class="fa-solid fa-location-dot text-sky-400"></i> ${window.currentMetaData.main_location || window.currentMetaData.country || '景點'}</div>`;
+                
+                card.innerHTML = `<div class="relative"><div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">${index > 0 ? `<button onclick="window.moveStopUp(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="上移"><i class="fa-solid fa-arrow-up"></i></button>` : ''}${index < dayData.stops.length - 1 ? `<button onclick="window.moveStopDown(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="下移"><i class="fa-solid fa-arrow-down"></i></button>` : ''}<button onclick="window.deleteStop(${day}, ${index}); event.stopPropagation();" class="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded text-xs" title="刪除"><i class="fa-solid fa-trash"></i></button></div><div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 group-hover:bg-sky-500 group-hover:text-white transition-colors z-10"><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i></div>${!isLast ? '<div class="w-0.5 h-full bg-slate-100 my-1"></div>' : ''}</div><div class="flex-1 pb-2"><div class="flex justify-between items-start mb-1"><span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">${stop.time}</span><div class="flex gap-1">${(stop.tags || []).map(t => `<span class="text-[10px] text-sky-500 bg-sky-50 px-1.5 rounded">${t}</span>`).join('')}</div></div>${locationBadge}<h3 class="text-lg font-bold text-slate-800 mb-1 group-hover:text-sky-600 outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-name-${stop.id}" data-editable>${stop.name}</h3><p class="text-sm text-slate-600 leading-relaxed outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-desc-${stop.id}" data-editable>${stop.desc}</p>${transportHtml}<div class="mt-2 text-xs flex gap-2"><button onclick="window.open('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.name)}&query_place_id=${lat},${lng}', '_blank'); event.stopPropagation();" class="bg-slate-100 hover:bg-green-100 text-slate-600 hover:text-green-700 px-2 py-1 rounded transition-colors"><i class="fa-solid fa-location-arrow"></i> 導航</button></div></div></div></div>`;
                 container.appendChild(card);
                 if (!isNaN(lat) && !isNaN(lng)) {
                     const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="marker-pin"></div><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i>`, iconSize: [30, 42], iconAnchor: [15, 42] });
@@ -1053,406 +842,226 @@
             if (routeCoords.length > 1) currentPolyline = L.polyline(routeCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '8, 8' }).addTo(map);
             if (bounds.length > 0) {
                 currentBounds = bounds;
-                setTimeout(() => {
-                    map.invalidateSize(); 
-                    if(map.getContainer().offsetWidth > 0) map.flyToBounds(bounds, { padding: [50, 50], animate: true, duration: 1.5 });
-                }, 200); 
+                setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50], animate: true }); }, 200); 
             }
-            
             if(isEditMode) updateEditUI();
         }
+        
+        // Summary & Cost Analysis
+        function renderSummaryView(container) {
+            const header = document.createElement('div'); header.className = "mb-4";
+            header.innerHTML = `<div class="flex items-center gap-2"><h2 class="text-2xl font-bold text-sky-900">🗓️ 行程總覽</h2></div><p class="text-sm text-slate-500 mt-1">全地圖檢視模式</p>`;
+            container.appendChild(header);
 
+            // Cost Analysis Section
+            const costs = window.currentMetaData.estimated_costs || { total: 0, accommodation: 0, transport: 0, food: 0, currency: 'TWD' };
+            const costDiv = document.createElement('div');
+            costDiv.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-4";
+            costDiv.innerHTML = `
+                <h3 class="font-bold text-sky-800 mb-3"><i class="fa-solid fa-wallet mr-2"></i>預算分析 (估算)</h3>
+                <div class="flex gap-4 items-center">
+                    <div class="w-1/3 relative" style="height:100px; width:100px;">
+                        <canvas id="costChart"></canvas>
+                    </div>
+                    <div class="flex-1 space-y-2 text-sm">
+                        <div class="flex justify-between border-b border-slate-50 pb-1"><span>🏠 住宿</span> <span class="font-bold">${costs.accommodation.toLocaleString()} ${costs.currency}</span></div>
+                        <div class="flex justify-between border-b border-slate-50 pb-1"><span>🚆 交通</span> <span class="font-bold">${costs.transport.toLocaleString()} ${costs.currency}</span></div>
+                        <div class="flex justify-between border-b border-slate-50 pb-1"><span>🍱 餐飲</span> <span class="font-bold">${costs.food.toLocaleString()} ${costs.currency}</span></div>
+                        <div class="flex justify-between pt-1 text-sky-600 text-base"><span>💰 總計</span> <span class="font-bold">${costs.total.toLocaleString()} ${costs.currency}</span></div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(costDiv);
+            
+            // Draw Chart
+            setTimeout(() => {
+                const ctx = document.getElementById('costChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['住宿', '交通', '餐飲'],
+                        datasets: [{
+                            data: [costs.accommodation, costs.transport, costs.food],
+                            backgroundColor: ['#f472b6', '#3b82f6', '#f59e0b'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                });
+            }, 100);
+
+            // Itinerary List
+            const bounds = [];
+            const allRouteCoords = [];
+            let globalStopIndex = 1;
+
+            Object.keys(window.currentItineraryData).forEach(dayKey => {
+                const dayData = window.currentItineraryData[dayKey];
+                const dayHeader = document.createElement('div');
+                dayHeader.className = "sticky top-0 bg-sky-50/90 backdrop-blur px-3 py-2 rounded-lg font-bold text-sky-800 text-sm border border-sky-100 z-10 mb-2 shadow-sm";
+                dayHeader.innerHTML = `${getDisplayDate(dayKey)} - ${dayData.title}`;
+                container.appendChild(dayHeader);
+
+                dayData.stops.forEach((stop) => {
+                    const lat = parseFloat(stop.lat); const lng = parseFloat(stop.lng);
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        allRouteCoords.push([lat, lng]); bounds.push([lat, lng]);
+                        const item = document.createElement('div');
+                        item.className = "flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100 mb-2";
+                        // Modified: Added Location Badge inside summary list item
+                        const locationText = window.currentMetaData.main_location || window.currentMetaData.country || '景點';
+                        item.innerHTML = `
+                            <div class="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shadow-sm shrink-0">${globalStopIndex}</div>
+                            <div class="flex-1 min-w-0">
+                                <div class="font-bold text-slate-800 text-sm truncate">${stop.name}</div>
+                                <div class="text-[10px] text-slate-400 mt-0.5"><i class="fa-solid fa-location-dot text-sky-400"></i> ${locationText}</div>
+                            </div>
+                        `;
+                        item.onclick = () => { switchDay(dayKey); focusLocation(lat, lng); };
+                        container.appendChild(item);
+
+                        const numberIcon = L.divIcon({ className: 'custom-number-icon', html: `<div class="number-icon">${globalStopIndex}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
+                        const marker = L.marker([lat, lng], { icon: numberIcon }).addTo(map).bindPopup(`<b>${globalStopIndex}. ${stop.name}</b>`);
+                        marker.on('click', () => focusLocation(lat, lng));
+                        markers[stop.id || Math.random()] = marker;
+                        globalStopIndex++;
+                    }
+                });
+            });
+
+            if (allRouteCoords.length > 1) {
+                currentPolyline = L.polyline(allRouteCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '6, 6' }).addTo(map);
+            }
+            if (bounds.length > 0) {
+                currentBounds = bounds;
+                setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50] }); }, 200);
+            }
+        }
+
+        // Pure AI Tips - No Lookup Table
         async function renderTips() {
             const container = document.getElementById('contentList');
-            container.innerHTML = '<div class="p-4 text-center"><div class="loader mx-auto mb-3"></div><p class="text-slate-500">分析行程中...</p></div>';
+            container.innerHTML = '<div class="p-4 text-center"><div class="loader mx-auto mb-3"></div><p class="text-slate-500">AI 正在分析行程地點並生成專屬建議...</p></div>';
             
-            if (!window.currentItineraryData) {
-                container.innerHTML = `<div class="p-4 text-center text-slate-500"><h3 class="font-bold text-lg mb-2">💡 貼心提示</h3><p>請先選擇或建立行程</p></div>`;
-                return;
-            }
-            
-            // 偵測國家 - 優先使用 AI 分析行程內容
-            let detectedCountries = [];
             const apiKey = window.safeStorage.getItem('gemini_api_key');
-            
-            // 如果有 API Key，用 AI 分析行程中會訪問哪些國家
-            if (apiKey) {
-                detectedCountries = await detectCountriesWithAI(apiKey);
-            }
-            
-            // 如果 AI 未能偵測，回退到靜態方式
-            if (detectedCountries.length === 0) {
-                detectedCountries = detectCountriesStatically();
-            }
-            
-            // 根據偵測到的國家生成 Tips
-            if (detectedCountries.length > 0) {
-                await renderMultiCountryTips(detectedCountries, apiKey);
+            if (!apiKey) {
+                container.innerHTML = `<div class="p-4 text-center"><p class="text-slate-500">請先連結 AI 以獲取即時分析提示。</p><button onclick="openSettingsModal()" class="mt-2 text-sky-500 font-bold">前往設定</button></div>`;
                 return;
-            } else {
-                container.innerHTML = `
-                    <div class="p-4">
-                        <div class="flex items-center gap-2 mb-4">
-                            <h2 class="text-2xl font-bold text-sky-900">💡 旅遊貼心提示</h2>
-                        </div>
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-                            <p class="text-slate-600 mb-4">未檢測到具體國家。請選擇已支援的國家：</p>
-                            <div class="grid grid-cols-2 gap-2">
-                                ${Object.keys(countryTipsDatabase).map(country => 
-                                    `<button onclick="alert('${countryTipsDatabase[country].name} - ${countryTipsDatabase[country].safety.substring(0, 20)}...')" 
-                                     class="px-2 py-2 bg-sky-100 hover:bg-sky-200 rounded text-sm font-medium text-sky-800 transition">
-                                        ${countryTipsDatabase[country].name}
-                                     </button>`
-                                ).join('')}
-                            </div>
-                        </div>
-                    </div>`;
             }
-        }
-        
-        // 【新增】使用 AI 分析行程中會訪問的國家（支持所有國家）
-        async function detectCountriesWithAI(apiKey) {
-            try {
-                const itineraryText = JSON.stringify(window.currentItineraryData, null, 2).substring(0, 2000);
-                
-                const prompt = `分析以下旅遊行程，識別出所有會訪問的國家和地區。
 
-行程內容：
-${itineraryText}
+            // Extract all unique locations
+            const locations = new Set();
+            Object.values(window.currentItineraryData).forEach(day => {
+                day.stops.forEach(stop => locations.add(stop.name));
+            });
+            const locationList = Array.from(locations).join(', ');
+            const country = window.currentMetaData.country || "該國家";
 
-請以 JSON 格式返回，包含國家名稱和英文代碼，格式如下：
-[
-  {"name": "日本", "code": "Japan"},
-  {"name": "美國", "code": "USA"},
-  {"name": "法國", "code": "France"}
-]
+            const prompt = `
+            我是旅客，即將前往 ${country}，會造訪以下地點：${locationList}。
+            請根據這些「具體地點」提供旅遊貼士。
+            
+            STRICT RULES:
+            1. DO NOT give generic advice. Be specific to the locations.
+            2. Output ONLY JSON format.
+            3. JSON schema:
+            {
+              "country": "${country}",
+              "safety": "針對上述地點的治安建議 (100字)",
+              "health": "當地的常見疾病、必要的疫苗接種建議、衛生注意事項等 (100字)",
+              "customs": "當地重要風俗禁忌 (100字)",
+              "transport_tips": "交通注意事項 (100字)",
+              "tipping_tax": "小費與退稅規則 (50字)",
+              "specific_advice": "針對 ${locationList} 的特別建議 (150字)"
+            }
+            `;
 
-規則：
-- 使用標準英文國家代碼（如 Japan, Switzerland, New Zealand）
-- 如果是多天歐洲行程或多國行程，請列出所有會訪問的國家
-- 如果行程中提到特定城市，根據城市推斷國家
-- 不論國家是否在預定義清單中，都要返回
+            // Retry Loop Logic
+            const maxRetries = 3;
+            let lastError = null;
 
-只返回 JSON 陣列，不需要其他文字。`;
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                    });
 
-                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{ text: prompt }]
-                        }],
-                        generationConfig: {
-                            temperature: 0.3,
-                            maxOutputTokens: 300
+                    // Handle 429 Quota Exceeded
+                    if (response.status === 429) {
+                        const retryAfter = 5000 * Math.pow(2, attempt); 
+                        console.warn(`Quota exceeded (429). Retrying in ${retryAfter}ms...`);
+                        if (attempt < maxRetries) {
+                            container.innerHTML = `<div class="p-4 text-center"><div class="loader mx-auto mb-3"></div><p class="text-orange-500">API 使用量大，正在排隊重試中... (${attempt + 1}/${maxRetries})</p></div>`;
+                            await new Promise(r => setTimeout(r, retryAfter));
+                            continue;
+                        } else {
+                            throw new Error("API 配額已滿，請稍後再試。");
                         }
-                    })
-                });
-                
-                if (!response.ok) return [];
-                
-                const data = await response.json();
-                if (!data.candidates || !data.candidates[0].content.parts[0].text) return [];
-                
-                const responseText = data.candidates[0].content.parts[0].text;
-                const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-                if (!jsonMatch) return [];
-                
-                const countries = JSON.parse(jsonMatch[0]);
-                return Array.isArray(countries) ? countries : [];
-            } catch (error) {
-                console.error('AI 國家偵測失敗:', error);
-                return [];
-            }
-        }
-        
-        // 【改進】靜態方式偵測國家（支持動態國家）
-        function detectCountriesStatically() {
-            const detectedCountries = new Set();
-            let allText = JSON.stringify({
-                data: window.currentItineraryData,
-                meta: window.currentMetaData || {}
-            }).toLowerCase();
-            
-            // 首先嘗試使用 locationToCountry 對應表
-            for (let location in locationToCountry) {
-                if (allText.includes(location.toLowerCase())) {
-                    detectedCountries.add(locationToCountry[location]);
-                }
-            }
-            
-            // 檢查國家名稱（來自數據庫）
-            for (let country in countryTipsDatabase) {
-                const countryName = countryTipsDatabase[country].name.toLowerCase();
-                if (allText.includes(countryName) || allText.includes(country.toLowerCase())) {
-                    detectedCountries.add(country);
-                }
-            }
-            
-            // 如果沒有偵測到任何國家，顯示提示
-            if (detectedCountries.size === 0) {
-                return [];
-            }
-            
-            return Array.from(detectedCountries);
-        }
-        
-        // 【改進】渲染多個國家的 Tips（支持動態國家）
-        async function renderMultiCountryTips(countries, apiKey) {
-            const container = document.getElementById('contentList');
-            let html = `<div class="p-4">
-                <div class="flex items-center gap-2 mb-2">
-                    <h2 class="text-2xl font-bold text-sky-900">💡 旅遊貼心提示</h2>
-                    ${apiKey ? '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">AI 驅動</span>' : '<span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">數據庫</span>'}
-                </div>`;
-            
-            // 提取國家名稱用於展示
-            const countryNames = countries.map(c => {
-                if (typeof c === 'object' && c.name) return c.name;
-                return countryTipsDatabase[c]?.name || c;
-            }).join(', ');
-            
-            html += `<p class="text-sm text-slate-500 mb-4">目的地: ${countryNames}</p>
-                <div class="space-y-4">`;
-            
-            for (let countryObj of countries) {
-                let countryCode = typeof countryObj === 'object' ? countryObj.code : countryObj;
-                let countryName = typeof countryObj === 'object' ? countryObj.name : (countryTipsDatabase[countryCode]?.name || countryCode);
-                
-                let tips;
-                
-                // 首先檢查是否在數據庫中
-                if (countryTipsDatabase[countryCode]) {
-                    // 嘗試用 AI 增強數據庫中的 Tips
-                    if (apiKey) {
-                        tips = await generateTipsWithGemini(countryCode, apiKey);
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        // Check specifically for quota error in body if status wasn't 429
+                        if (data.error.code === 429 || (data.error.message && data.error.message.includes('quota'))) {
+                             const retryAfter = 5000 * Math.pow(2, attempt);
+                             console.warn(`Quota error in body. Retrying in ${retryAfter}ms...`);
+                             if (attempt < maxRetries) {
+                                container.innerHTML = `<div class="p-4 text-center"><div class="loader mx-auto mb-3"></div><p class="text-orange-500">API 使用量大，正在排隊重試中... (${attempt + 1}/${maxRetries})</p></div>`;
+                                await new Promise(r => setTimeout(r, retryAfter));
+                                continue;
+                             } else {
+                                throw new Error("API 配額已滿，請稍後再試。");
+                             }
+                        }
+                        throw new Error(data.error.message);
+                    }
+
+                    if (!data.candidates || data.candidates.length === 0) {
+                        throw new Error("AI 未回傳任何建議 (可能被安全設定阻擋)");
                     }
                     
-                    // 如果 AI 失敗，使用數據庫
-                    if (!tips) {
-                        const staticTips = countryTipsDatabase[countryCode];
-                        tips = {
-                            country: staticTips.name,
-                            safety: staticTips.safety,
-                            customs: staticTips.customs,
-                            entry: staticTips.entry,
-                            tax: staticTips.tax,
-                            tips: staticTips.tips,
-                            source: 'database'
-                        };
+                    const part = data.candidates[0].content?.parts?.[0];
+                    if (!part || !part.text) {
+                        throw new Error("AI 回傳格式錯誤");
                     }
-                } else {
-                    // 不在數據庫中，用 AI 生成 Tips
-                    if (apiKey) {
-                        tips = await generateDynamicCountryTips(countryName, countryCode, apiKey);
-                    } else {
-                        // 無 API Key，顯示基本信息
-                        tips = {
-                            country: countryName,
-                            safety: '暫無信息',
-                            customs: '暫無信息',
-                            entry: '暫無信息',
-                            tax: '暫無信息',
-                            tips: '需連結 Google AI 以獲取詳細資訊',
-                            source: 'limited'
-                        };
+                    
+                    const text = part.text;
+                    const jsonMatch = text.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch) throw new Error("無法解析 JSON");
+                    const tips = JSON.parse(jsonMatch[0]);
+                    
+                    container.innerHTML = `
+                        <div class="p-4 space-y-4">
+                            <div class="flex items-center gap-2"><h2 class="text-2xl font-bold text-sky-900">💡 ${tips.country} 旅遊提示</h2><span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded">AI 生成</span></div>
+                            <div class="bg-amber-50 p-4 rounded-lg border border-amber-100"><h4 class="font-bold text-amber-800 mb-1">🛡️ 治安</h4><p class="text-sm text-amber-900">${tips.safety}</p></div>
+                            <div class="bg-red-50 p-4 rounded-lg border border-red-100"><h4 class="font-bold text-red-800 mb-1">🏥 健康與醫療</h4><p class="text-sm text-red-900">${tips.health}</p></div>
+                            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100"><h4 class="font-bold text-blue-800 mb-1">🤝 風俗</h4><p class="text-sm text-blue-900">${tips.customs}</p></div>
+                            <div class="bg-green-50 p-4 rounded-lg border border-green-100"><h4 class="font-bold text-green-800 mb-1">🚆 交通</h4><p class="text-sm text-green-900">${tips.transport_tips}</p></div>
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-100"><h4 class="font-bold text-gray-800 mb-1">💰 稅務與小費</h4><p class="text-sm text-gray-900">${tips.tipping_tax}</p></div>
+                            <div class="bg-sky-50 p-4 rounded-lg border border-sky-100"><h4 class="font-bold text-sky-800 mb-1">✨ 專屬建議</h4><p class="text-sm text-sky-900">${tips.specific_advice}</p></div>
+                        </div>
+                    `;
+                    return; // Success exit
+
+                } catch (e) {
+                    console.error(`Attempt ${attempt + 1} failed:`, e);
+                    lastError = e;
+                    if (attempt < maxRetries && !e.message.includes('quota')) { 
+                         // Backoff for other non-quota errors (e.g. network blip)
+                         await new Promise(r => setTimeout(r, 2000));
                     }
                 }
-                
-                html += generateTipsHtml(tips);
             }
-            
-            html += '</div></div>';
-            container.innerHTML = html;
-        }
-        
-        // 【新增】為動態國家生成 Tips（不在內建數據庫中的國家）
-        async function generateDynamicCountryTips(countryName, countryCode, apiKey) {
-            try {
-                const prompt = `你是一位世界旅遊專家。為即將訪問 ${countryName} 的台灣遊客提供詳細的旅遊建議。
 
-請以 JSON 格式提供以下信息（務必是有效的 JSON 格式）:
-{
-  "safety": "該國的治安狀況和安全建議（100字以內）",
-  "customs": "風土民情和禮儀注意事項（100字以內）",
-  "entry": "出入境須知和簽證要求（100字以內）",
-  "tax": "稅率、購物退稅政策（100字以內）",
-  "tips": "旅遊小貼士，包括交通、飲食、購物、住宿等（200字以內）"
-}
-
-回覆時只需提供 JSON 對象，不需要其他文字。`;
-
-                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{ text: prompt }]
-                        }],
-                        generationConfig: {
-                            temperature: 0.7,
-                            maxOutputTokens: 800
-                        }
-                    })
-                });
-                
-                if (!response.ok) return null;
-                
-                const data = await response.json();
-                if (!data.candidates || !data.candidates[0].content.parts[0].text) return null;
-                
-                const responseText = data.candidates[0].content.parts[0].text;
-                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) return null;
-                
-                const tips = JSON.parse(jsonMatch[0]);
-                return {
-                    country: countryName,
-                    ...tips,
-                    source: 'ai-dynamic'
-                };
-            } catch (error) {
-                console.error('動態國家 Tips 生成失敗:', error);
-                return null;
-            }
-        }
-        
-        // 【改進】生成單個國家 Tips 的 HTML（支持多種來源標記）
-        function generateTipsHtml(tips) {
-            // 決定來源標記
-            let sourceBadge = '';
-            if (tips.source === 'ai-dynamic') {
-                sourceBadge = '<span class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded ml-2">✨ AI 生成</span>';
-            } else if (tips.source === 'gemini') {
-                sourceBadge = '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded ml-2">🤖 AI 增強</span>';
-            } else if (tips.source === 'database') {
-                sourceBadge = '<span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded ml-2">📚 數據庫</span>';
-            } else if (tips.source === 'limited') {
-                sourceBadge = '<span class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded ml-2">⚠️ 有限信息</span>';
-            }
-            
-            return `
-                <div class="border border-slate-200 rounded-lg p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="font-bold text-sky-900">${tips.country}</h3>
-                        ${sourceBadge}
-                    </div>
-                    
-                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
-                        <div class="flex items-start gap-2">
-                            <i class="fa-solid fa-shield-halved text-amber-600 text-lg mt-0.5 flex-shrink-0"></i>
-                            <div class="flex-1 text-sm">
-                                <h4 class="font-bold text-amber-900 mb-1">🛡️ 治安狀況</h4>
-                                <p class="text-amber-800">${tips.safety || '暫無信息'}</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                        <div class="flex items-start gap-2">
-                            <i class="fa-solid fa-handshake text-blue-600 text-lg mt-0.5 flex-shrink-0"></i>
-                            <div class="flex-1 text-sm">
-                                <h4 class="font-bold text-blue-900 mb-1">🤝 風土民情</h4>
-                                <p class="text-blue-800">${tips.customs || '暫無信息'}</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                        <div class="flex items-start gap-2">
-                            <i class="fa-solid fa-passport text-green-600 text-lg mt-0.5 flex-shrink-0"></i>
-                            <div class="flex-1 text-sm">
-                                <h4 class="font-bold text-green-900 mb-1">🛂 出入境須知</h4>
-                                <p class="text-green-800">${tips.entry || '暫無信息'}</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
-                        <div class="flex items-start gap-2">
-                            <i class="fa-solid fa-receipt text-purple-600 text-lg mt-0.5 flex-shrink-0"></i>
-                            <div class="flex-1 text-sm">
-                                <h4 class="font-bold text-purple-900 mb-1">💰 稅率與退稅</h4>
-                                <p class="text-purple-800">${tips.tax || '暫無信息'}</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-sky-50 border border-sky-200 rounded-lg p-3">
-                        <div class="flex items-start gap-2">
-                            <i class="fa-solid fa-lightbulb text-sky-600 text-lg mt-0.5 flex-shrink-0"></i>
-                            <div class="flex-1 text-sm">
-                                <h4 class="font-bold text-sky-900 mb-1">✨ 旅遊小貼士</h4>
-                                <p class="text-sky-800 whitespace-pre-wrap">${tips.tips || '暫無信息'}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-        }
-        
-        async function generateTipsWithGemini(country, apiKey) {
-            try {
-                const countryInfo = countryTipsDatabase[country];
-                const itineraryText = JSON.stringify(window.currentItineraryData, null, 2).substring(0, 1000);
-                
-                const prompt = `你是一位經驗豐富的旅遊專家。根據以下行程信息，為旅客提供詳細的旅遊建議。
-
-國家: ${countryInfo.name}
-行程摘要: ${itineraryText}
-
-請以 JSON 格式提供以下信息（務必是有效的 JSON 格式）:
-{
-  "safety": "該地的治安狀況和安全建議（150字以內）",
-  "customs": "風土民情和禮儀注意事項（150字以內）",
-  "entry": "出入境須知和簽證要求（150字以內）",
-  "tax": "稅率、退稅政策和金融建議（150字以內）",
-  "tips": "旅遊小貼士，包括交通、飲食、購物、住宿等（300字以內）"
-}
-
-回覆時只需提供 JSON 對象，不需要其他文字。`;
-
-                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{ text: prompt }]
-                        }],
-                        generationConfig: {
-                            temperature: 0.7,
-                            maxOutputTokens: 1200
-                        }
-                    })
-                });
-                
-                if (!response.ok) {
-                    console.error('Gemini API 錯誤:', response.status);
-                    return null;
-                }
-                
-                const data = await response.json();
-                if (!data.candidates || !data.candidates[0].content.parts[0].text) {
-                    console.error('Gemini 回應格式錯誤');
-                    return null;
-                }
-                
-                const responseText = data.candidates[0].content.parts[0].text;
-                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) {
-                    console.error('無法從 Gemini 回應中提取 JSON');
-                    return null;
-                }
-                
-                const tips = JSON.parse(jsonMatch[0]);
-                return {
-                    country: countryTipsDatabase[country].name,
-                    ...tips,
-                    source: 'gemini'
-                };
-            } catch (error) {
-                console.error('Gemini API 調用失敗:', error);
-                return null;
-            }
+            // Final Error Display
+            container.innerHTML = `<div class="p-4 text-center text-red-500">
+                <i class="fa-solid fa-circle-exclamation text-2xl mb-2"></i><br>
+                分析失敗<br>
+                <span class="text-xs text-slate-400">${lastError ? lastError.message : '未知錯誤'}</span>
+            </div>`;
         }
         
         function focusLocation(lat, lng) {
@@ -1460,291 +1069,199 @@ ${itineraryText}
             if (map.getContainer().offsetWidth > 0) map.flyTo([lat, lng], 16, { duration: 1 });
         }
         
-        // 【新增】地图搜索功能 - 使用 OpenStreetMap Nominatim API
         window.searchMapLocation = async () => {
-            const searchInput = document.getElementById('mapSearchInput');
-            const query = searchInput.value.trim();
-            if (!query) {
-                window.showToast("請輸入搜尋地點");
-                return;
-            }
-            
+            const query = document.getElementById('mapSearchInput').value.trim();
+            if (!query) return window.showToast("請輸入搜尋地點");
             const resultsDiv = document.getElementById('mapSearchResults');
-            resultsDiv.innerHTML = '<div class="p-3 text-center text-slate-500 text-sm">搜尋中...</div>';
-            resultsDiv.classList.remove('hidden');
-            
+            resultsDiv.innerHTML = '<div class="p-3 text-center text-slate-500 text-sm">搜尋中...</div>'; resultsDiv.classList.remove('hidden');
             try {
-                const response = await fetch(
-                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8`
-                );
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`);
                 const results = await response.json();
-                
-                if (results.length === 0) {
-                    resultsDiv.innerHTML = '<div class="p-3 text-center text-slate-400 text-sm">找不到相關地點</div>';
-                    return;
-                }
-                
+                if (results.length === 0) { resultsDiv.innerHTML = '<div class="p-3 text-center text-slate-400 text-sm">無結果</div>'; return; }
                 resultsDiv.innerHTML = '';
-                results.forEach((result, idx) => {
+                results.forEach(result => {
                     const item = document.createElement('div');
-                    item.className = "p-3 border-b border-slate-100 hover:bg-sky-50 cursor-pointer transition-colors flex items-start gap-2";
-                    item.innerHTML = `
-                        <div class="flex-1 min-w-0">
-                            <div class="font-bold text-slate-800 text-sm truncate">${result.name}</div>
-                            <div class="text-xs text-slate-500 truncate">${result.address || ''}</div>
-                        </div>
-                    `;
+                    item.className = "p-3 border-b border-slate-100 hover:bg-sky-50 cursor-pointer text-sm font-bold text-slate-700";
+                    item.innerText = result.display_name.split(',')[0];
                     item.onclick = () => {
-                        const lat = parseFloat(result.lat);
-                        const lng = parseFloat(result.lon);
-                        focusLocation(lat, lng);
-                        resultsDiv.classList.add('hidden');
-                        showAddToItineraryPrompt(result.name, lat, lng);
-                        window.autoSwitchToItinerary();
+                        const lat = parseFloat(result.lat); const lng = parseFloat(result.lon);
+                        focusLocation(lat, lng); resultsDiv.classList.add('hidden');
+                        showAddToItineraryPrompt(result.display_name.split(',')[0], lat, lng);
                     };
                     resultsDiv.appendChild(item);
                 });
-            } catch (err) {
-                resultsDiv.innerHTML = '<div class="p-3 text-center text-red-500 text-sm">搜尋失敗：' + err.message + '</div>';
-                console.error('Search error:', err);
-            }
+            } catch (err) { resultsDiv.innerHTML = '<div class="p-3 text-center text-red-500 text-sm">錯誤</div>'; }
         };
-        
-        // 【新增】顯示加入行程提示
+
         window.showAddToItineraryPrompt = (placeName, lat, lng) => {
             const container = document.getElementById('contentList');
-            
             const promptDiv = document.createElement('div');
             promptDiv.className = "bg-gradient-to-r from-sky-50 to-blue-50 border-2 border-sky-300 rounded-xl p-4 mb-4 sticky top-0 z-20 shadow-md";
             promptDiv.innerHTML = `
-                <div class="flex items-center gap-3 mb-3">
-                    <i class="fa-solid fa-location-dot text-sky-600 text-xl"></i>
-                    <div class="flex-1">
-                        <div class="font-bold text-slate-800">${placeName}</div>
-                        <div class="text-xs text-slate-500">座標: ${lat.toFixed(4)}, ${lng.toFixed(4)}</div>
-                    </div>
-                </div>
-                <div class="flex gap-2">
-                    <select id="addToDaySelect" class="flex-1 px-3 py-2 border border-sky-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-sky-500 outline-none">
-                        ${Object.keys(window.currentItineraryData).map(day => `<option value="${day}">第 ${day} 天</option>`).join('')}
-                    </select>
-                    <button onclick="window.confirmAddToItinerary('${placeName}', ${lat}, ${lng})" class="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-1">
-                        <i class="fa-solid fa-plus"></i> 加入
-                    </button>
-                    <button onclick="this.closest('.sticky').remove()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-sm transition-colors">
-                        <i class="fa-solid fa-times"></i>
-                    </button>
-                </div>
+                <div class="flex items-center gap-3 mb-3"><i class="fa-solid fa-location-dot text-sky-600 text-xl"></i><div class="flex-1"><div class="font-bold text-slate-800">${placeName}</div><div class="text-xs text-slate-500">座標: ${lat.toFixed(4)}, ${lng.toFixed(4)}</div></div></div>
+                <div class="flex gap-2"><select id="addToDaySelect" class="flex-1 px-3 py-2 border border-sky-200 rounded-lg text-sm outline-none">${Object.keys(window.currentItineraryData).map(day => `<option value="${day}">第 ${day} 天</option>`).join('')}</select><button onclick="window.confirmAddToItinerary('${placeName}', ${lat}, ${lng})" class="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-bold text-sm"><i class="fa-solid fa-plus"></i> 加入</button><button onclick="this.closest('.sticky').remove()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-sm"><i class="fa-solid fa-times"></i></button></div>
             `;
-            
-            if (container.firstChild) {
-                container.insertBefore(promptDiv, container.firstChild);
-            } else {
-                container.appendChild(promptDiv);
-            }
+            container.prepend(promptDiv);
         };
         
-        
-        // 【新增】手機版優化 - 自動切換到行程面板
-        window.autoSwitchToItinerary = () => {
-            if(window.innerWidth < 768) {
-                setTimeout(() => toggleMobileView('list'), 300);
-            }
-        };
-         
-         // 【新增】確認加入行程
         window.confirmAddToItinerary = (placeName, lat, lng) => {
-            window.autoSwitchToItinerary();
-            const daySelect = document.getElementById('addToDaySelect');
-            const day = daySelect.value;
-            
-            const newStop = {
-                id: Date.now(),
-                time: "待定",
-                name: placeName,
-                lat: lat,
-                lng: lng,
-                icon: "fa-map-pin",
-                desc: "在地圖上搜尋的地點",
-                tags: ["新增"]
-            };
-            
-            if (!window.currentItineraryData[day]) {
-                window.showToast("行程不存在");
-                return;
-            }
-            
-            window.currentItineraryData[day].stops.push(newStop);
-            window.saveCurrentItinerary();
-            window.showToast("已加入行程！");
-            
-            // 刷新當前 Day 視圖並移除提示框
-            switchDay(day);
-            document.querySelector('.sticky')?.remove();
-            
-            // 清空搜尋框
-            document.getElementById('mapSearchInput').value = '';
-            document.getElementById('mapSearchResults').classList.add('hidden');
-        };
-        
-        // 【新增】回車搜尋
-        document.addEventListener('DOMContentLoaded', () => {
-            const searchInput = document.getElementById('mapSearchInput');
-            if (searchInput) {
-                searchInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') window.searchMapLocation();
-                });
-            }
-        });
-        
-        window.moveStopUp = (day, index) => {
-            if(index <= 0) return;
-            const stops = window.currentItineraryData[day].stops;
-            [stops[index - 1], stops[index]] = [stops[index], stops[index - 1]];
-            switchDay(day);
-            window.saveCurrentItinerary();
-            window.showToast("已上移");
+            const day = document.getElementById('addToDaySelect').value;
+            window.currentItineraryData[day].stops.push({ id: Date.now(), time: "待定", name: placeName, lat: lat, lng: lng, icon: "fa-map-pin", desc: "在地圖上搜尋的地點", tags: ["新增"] });
+            window.saveCurrentItinerary(); window.showToast("已加入行程！"); switchDay(day);
+            if(window.innerWidth < 768) toggleMobileView('list');
         };
 
-        // 【新增】下移景點
-        window.moveStopDown = (day, index) => {
-            const stops = window.currentItineraryData[day].stops;
-            if(index >= stops.length - 1) return;
-            [stops[index], stops[index + 1]] = [stops[index + 1], stops[index]];
-            switchDay(day);
-            window.saveCurrentItinerary();
-            window.showToast("已下移");
-        };
-
-        // 【新增】刪除景點
-        window.deleteStop = (day, index) => {
-            if(!confirm('確定要刪除這個景點嗎？')) return;
-            const stops = window.currentItineraryData[day].stops;
-            stops.splice(index, 1);
-            switchDay(day);
-            window.saveCurrentItinerary();
-            window.showToast("已刪除");
-        };
+        window.moveStopUp = (day, index) => { if(index <= 0) return; const stops = window.currentItineraryData[day].stops; [stops[index - 1], stops[index]] = [stops[index], stops[index - 1]]; switchDay(day); window.saveCurrentItinerary(); };
+        window.moveStopDown = (day, index) => { const stops = window.currentItineraryData[day].stops; if(index >= stops.length - 1) return; [stops[index], stops[index + 1]] = [stops[index + 1], stops[index]]; switchDay(day); window.saveCurrentItinerary(); };
+        window.deleteStop = (day, index) => { if(!confirm('確定刪除？')) return; window.currentItineraryData[day].stops.splice(index, 1); switchDay(day); window.saveCurrentItinerary(); };
+        window.openFlightSearch = () => { window.open('https://flight.sabretn.com.tw/newdefault', '_blank'); };
         
-        // 【新增】打開航班查詢
-        window.openFlightSearch = () => {
-            window.open('https://flight.sabretn.com.tw/newdefault', '_blank');
-        };
-
         window.toggleMobileView = (view) => {
-            const list = document.getElementById('itineraryPanel');
-            const mapEl = document.getElementById('mapPanel');
-            const navList = document.getElementById('nav-list');
-            const navMap = document.getElementById('nav-map');
+            const list = document.getElementById('itineraryPanel'); const mapEl = document.getElementById('mapPanel');
+            const navList = document.getElementById('nav-list'); const navMap = document.getElementById('nav-map');
             if(view === 'list') { list.classList.add('active'); mapEl.classList.remove('active'); navList.classList.replace('text-slate-400', 'text-sky-600'); navMap.classList.replace('text-sky-600', 'text-slate-400'); }
             else { list.classList.remove('active'); mapEl.classList.add('active'); navMap.classList.replace('text-slate-400', 'text-sky-600'); navList.classList.replace('text-sky-600', 'text-slate-400'); setTimeout(() => { map.invalidateSize(); if(currentBounds) map.fitBounds(currentBounds, {padding:[50,50]}); }, 100); }
         };
 
         window.handleGenerateClick = async () => {
-            const promptInput = document.getElementById('aiPromptInput');
-            const prompt = promptInput.value;
+            const prompt = document.getElementById('aiPromptInput').value;
             const startDate = document.getElementById('aiStartDate').value;
-            if(!prompt.trim()) { alert("請輸入您的旅遊偏好！"); promptInput.focus(); return; }
+            const apiKey = window.safeStorage.getItem('gemini_api_key') || envApiKey;
             
-            let currentApiKey = envApiKey;
-            if (!currentApiKey) currentApiKey = window.safeStorage.getItem('gemini_api_key');
-            
-            if (!currentApiKey) {
-                if(confirm("未偵測到 API Key。是否使用「模擬演示模式」產生範例行程？\n(若要真實 AI 規劃，請按取消並前往設定輸入 Key)")) {
-                    window.runMockGeneration();
-                } else {
-                    window.closeModal('aiModal');
-                    window.openSettingsModal();
-                }
-                return;
-            }
+            if(!prompt.trim()) return alert("請輸入需求");
+            if (!apiKey) return window.useDemoMode();
 
             const btn = document.getElementById('generateBtn');
             const originalText = btn.innerHTML;
-            btn.innerHTML = `<div class="loader w-4 h-4 border-2 border-white border-t-transparent"></div>`;
-            btn.disabled = true;
+            btn.innerHTML = `<div class="loader w-4 h-4 border-2 border-white border-t-transparent"></div>`; btn.disabled = true;
             document.getElementById('aiErrorMsg').classList.add('hidden');
 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${currentApiKey}`;
             const systemPrompt = `
-            You are a Worldwide Travel Guide API. Generate a travel itinerary JSON based on the user's request.
-            RULES:
-            1. Return ONLY valid JSON. No markdown.
-            2. Structure must match this exact schema:
+            You are a Worldwide Travel Guide API. Generate a travel itinerary JSON.
+            STRICT RULES:
+            1. Return ONLY valid JSON.
+            2. Schema:
                {
-                 "meta": { "currency": "1 TWD ≈ 4.7 JPY", "weather_summary": "..." },
+                 "meta": { 
+                    "country": "Main Country (e.g. Japan)",
+                    "main_location": "Country, City (e.g. Japan, Kyoto)",
+                    "currency": "1 TWD ≈ X.X LOC", 
+                    "estimated_costs": { "accommodation": 0, "transport": 0, "food": 0, "total": 0, "currency": "LOC" }
+                 },
                  "days": {
                     "1": { 
-                       "title": "...", "weather": "...", "desc": "...", 
+                       "title": "Day Title", "weather": "Forecast", "desc": "Description", 
                        "stops": [ { 
-                           "id": 1, "time": "...", "name": "...", "lat": 0.0, "lng": 0.0, "icon": "fa-landmark", "desc": "...", 
-                           "transport": { "mode": "Bus", "desc": "...", "price": "...", "duration": "...", "steps": ["..."] }, 
-                           "tips": "...", "tags": ["..."] 
+                           "id": 1, "time": "Morning", "name": "Place Name", "lat": 35.0, "lng": 135.0, "icon": "fa-landmark", "desc": "Short Desc", 
+                           "transport": { "mode": "Bus", "desc": "Details", "price": "100" }, 
+                           "tags": ["Tag"] 
                        } ] 
                     }
                  }
                }
-            3. "currency" MUST be in the exact string format "1 AAA ≈ X.X BBB".
-            4. Coordinates must be HIGH PRECISION REAL coordinates.
-            5. Detailed transport steps required.
-            6. Traditional Chinese.
+            3. "estimated_costs" is MANDATORY. Estimate realistic costs for the whole trip in local currency.
+            4. "main_location" MUST be "Country, City" format.
+            5. Coordinates must be real.
+            6. Language: Traditional Chinese.
             `;
 
-            try {
-                let responseText;
-                for(let i=0; i<5; i++) {
-                    try {
-                        const response = await fetch(apiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                contents: [{ parts: [{ text: prompt }] }],
-                                systemInstruction: { parts: [{ text: systemPrompt }] },
-                                generationConfig: { responseMimeType: "application/json" }
-                            })
-                        });
-                        if(!response.ok) throw new Error(response.status);
-                        const data = await response.json();
-                        responseText = data.candidates[0].content.parts[0].text;
-                        break;
-                    } catch(e) {
-                        if(i===4) throw e;
-                        await new Promise(r => setTimeout(r, 1000 * Math.pow(2,i)));
+            // Retry Loop Logic for Generate Itinerary
+            const maxRetries = 3;
+            let lastError = null;
+
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            systemInstruction: { parts: [{ text: systemPrompt }] },
+                            generationConfig: { responseMimeType: "application/json" }
+                        })
+                    });
+
+                    // Handle 429 Quota Exceeded
+                    if (response.status === 429) {
+                        const retryAfter = 5000 * Math.pow(2, attempt); 
+                        console.warn(`Quota exceeded (429). Retrying in ${retryAfter}ms...`);
+                        if (attempt < maxRetries) {
+                            btn.innerHTML = `<span class="text-xs">API忙線中...重試(${attempt + 1})</span>`;
+                            await new Promise(r => setTimeout(r, retryAfter));
+                            continue;
+                        } else {
+                            throw new Error("API 配額已滿，請稍後再試。");
+                        }
                     }
-                }
-                
-                const data = JSON.parse(responseText);
-                if(data && data.days) {
-                    if(!data.meta) data.meta = {};
-                    data.meta.startDate = startDate;
-                    window.loadItineraryFromHistory(data.days, data.meta, null);
+
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        // Check specifically for quota error in body if status wasn't 429
+                        if (data.error.code === 429 || (data.error.message && data.error.message.includes('quota'))) {
+                             const retryAfter = 5000 * Math.pow(2, attempt);
+                             console.warn(`Quota error in body. Retrying in ${retryAfter}ms...`);
+                             if (attempt < maxRetries) {
+                                btn.innerHTML = `<span class="text-xs">API忙線中...重試(${attempt + 1})</span>`;
+                                await new Promise(r => setTimeout(r, retryAfter));
+                                continue;
+                             } else {
+                                throw new Error("API 配額已滿，請稍後再試。");
+                             }
+                        }
+                        throw new Error(data.error.message);
+                    }
+
+                    if (!data.candidates || data.candidates.length === 0) {
+                        throw new Error("AI 未回傳任何建議 (可能被安全設定阻擋)");
+                    }
+                    
+                    const part = data.candidates[0].content?.parts?.[0];
+                    if (!part || !part.text) {
+                        throw new Error("AI 回傳格式錯誤");
+                    }
+
+                    const jsonText = part.text;
+                    const result = JSON.parse(jsonText);
+                    
+                    result.meta.startDate = startDate;
+                    window.loadItineraryFromHistory(result.days, result.meta, null);
                     window.closeModal('aiModal');
                     window.saveCurrentItinerary();
-                } else {
-                    throw new Error("Invalid JSON");
+                    return; // Success exit
+
+                } catch (e) {
+                    console.error(`Attempt ${attempt + 1} failed:`, e);
+                    lastError = e;
+                    if (attempt < maxRetries && !e.message.includes('quota')) { 
+                         // Backoff for other non-quota errors (e.g. network blip)
+                         await new Promise(r => setTimeout(r, 2000));
+                    }
                 }
-            } catch (e) {
-                console.error("AI Error:", e);
-                document.getElementById('aiErrorMsg').innerText = "生成失敗，請檢查 API Key 或網路";
-                document.getElementById('aiErrorMsg').classList.remove('hidden');
-            } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
             }
+
+            // Final Error Display
+            console.error(lastError);
+            const errorMsgEl = document.getElementById('aiErrorMsg');
+            errorMsgEl.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> <span>${lastError ? lastError.message : '發生錯誤'}</span>`;
+            errorMsgEl.classList.remove('hidden');
+            btn.innerHTML = originalText; 
+            btn.disabled = false;
         };
 
         window.runMockGeneration = () => {
-             // Reusing existing mock logic but omitted here for brevity in file update
              const btn = document.getElementById('generateBtn');
              const originalText = btn.innerHTML;
              btn.innerHTML = `<div class="loader w-4 h-4 border-2 border-white border-t-transparent"></div>`;
              setTimeout(() => {
-                 alert("已載入倫敦範例行程！(模擬模式)");
+                 alert("已載入範例！");
                  btn.innerHTML = originalText;
-             }, 1000);
+                 window.closeModal('aiModal');
+             }, 800);
         };
     </script>
 </body>
 </html>
+
 
 
