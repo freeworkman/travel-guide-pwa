@@ -849,8 +849,9 @@
             if (routeCoords.length > 1) currentPolyline = L.polyline(routeCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '8, 8' }).addTo(map);
             if (bounds.length > 0) {
                 currentBounds = bounds;
-                setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50] }); }, 200);
+                setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50] }); }, 200); 
             }
+            if(isEditMode) updateEditUI();
         }
         
         // Summary & Cost Analysis
@@ -1275,6 +1276,7 @@
     </script>
 </body>
 </html>
+
 
 
 
