@@ -490,7 +490,8 @@
                 let url;
                 if (USE_NETLIFY_PROXY) {
                      // 確保在 blob 環境下也能構建正確的相對路徑 (雖然 blob 下通常無法連到後端)
-                     url = `/.netlify/functions/weather?lat=${lat}&lon=${lng}`;
+                     //url = `/.netlify/functions/weather?lat=${lat}&lon=${lng}`; // 舊的 Netlify 寫法
+                      url = `/weather?lat=${lat}&lon=${lng}`; //Cloudflare 的寫法
                 } else {
                      if(!DIRECT_API_KEY) return null;
                      url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lng}&units=metric&lang=zh_tw&appid=${DIRECT_API_KEY}`;
@@ -1288,6 +1289,7 @@
     </script>
 </body>
 </html>
+
 
 
 
