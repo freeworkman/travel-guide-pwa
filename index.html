@@ -373,7 +373,7 @@
 
     <script>
         const envApiKey = ""; 
-        const OPENWEATHER_API_KEY = "f2dcf92ac0c917a85ced2e416d61b385"; 
+        // const OPENWEATHER_API_KEY = ""; // Removed: Key handled by backend proxy
         window.currentItineraryData = null;
         window.currentMetaData = null;
         window.currentDocId = null;
@@ -479,13 +479,20 @@
         }
 
         window.fetchWeatherData = async (lat, lng, dayIndex) => {
-            if (!OPENWEATHER_API_KEY) return null;
-            const cacheKey = `${lat},${lng},${dayIndex}`; // Include dayIndex to avoid stale cache for same location different days if needed, but forecast is time based.
+            const cacheKey = `${lat},${lng},${dayIndex}`;
             if (weatherCache[cacheKey]) return weatherCache[cacheKey];
             
             try {
-                const response = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lng}&units=metric&lang=zh_tw&appid=${OPENWEATHER_API_KEY}`);
-                if (!response.ok) throw new Error('天氣API查詢失敗');
+                // Call local proxy function
+                const response = await fetch(`/.netlify/functions/weather?lat=${lat}&lon=${lng}`);
+                
+                if (!response.ok) {
+                    if (response.status === 404) {
+                       console.warn("Weather proxy not found. (Are you running locally without netlify dev?)");
+                       return null;
+                    }
+                    throw new Error('天氣API查詢失敗');
+                }
                 const data = await response.json();
                 // We cache the raw response.
                 return data; 
@@ -842,7 +849,7 @@
             if (routeCoords.length > 1) currentPolyline = L.polyline(routeCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '8, 8' }).addTo(map);
             if (bounds.length > 0) {
                 currentBounds = bounds;
-                setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50], animate: true }); }, 200); 
+                setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50] }); }, 200); 
             }
             if(isEditMode) updateEditUI();
         }
@@ -1269,6 +1276,7 @@
     </script>
 </body>
 </html>
+
 
 
 
