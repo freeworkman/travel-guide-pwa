@@ -41,7 +41,7 @@ export default {
 
     // === 靜態資源處理區塊 ===
     // 如果不是天氣 API，就直接回傳對應的網頁檔案 (index.html, css, js 等)
-    // env.ASSETS 是 Cloudflare Pages 專用的變數
+    // env.ASSETS 是 Cloudflare Pages 專用的變數，代表靜態資源
     return env.ASSETS.fetch(request);
   }
 };
