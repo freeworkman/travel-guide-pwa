@@ -484,7 +484,7 @@
             
             try {
                 // Call Cloudflare Pages Function at root path /weather
-                const url = `/api/weather?lat=${lat}&lon=${lng}`;
+                const url='/weather?lat=${lat}&lon=${lng}`;
                 const response = await fetch(url);
                 
                 if (!response.ok) {
@@ -1218,6 +1218,7 @@
     </script>
 </body>
 </html>
+
 
 
 
