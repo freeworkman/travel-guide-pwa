@@ -122,7 +122,17 @@
             }
         };
         // Global Triggers
-        window.openAIModal = () => document.getElementById('aiModal').classList.remove('hidden');
+        // Updated: Force reset button state when opening modal
+        window.openAIModal = () => {
+            const btn = document.getElementById('generateBtn');
+            if(btn) {
+                // HARD RESET: Ensure button text is correct every time modal opens
+                btn.innerHTML = '<span>出發！</span><i class="fa-solid fa-paper-plane"></i>';
+                btn.disabled = false;
+            }
+            document.getElementById('aiErrorMsg').classList.add('hidden');
+            document.getElementById('aiModal').classList.remove('hidden');
+        };
         window.openHistoryModal = () => document.getElementById('historyModal').classList.remove('hidden');
         window.openShareModal = () => document.getElementById('shareModal').classList.remove('hidden');
         window.openSettingsModal = () => {
@@ -857,7 +867,7 @@
             if (routeCoords.length > 1) currentPolyline = L.polyline(routeCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '8, 8' }).addTo(map);
             if (bounds.length > 0) {
                 currentBounds = bounds;
-                setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50], animate: true }); }, 200); 
+                setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50] }); }, 200); 
             }
             if(isEditMode) updateEditUI();
         }
@@ -1177,7 +1187,8 @@
             if (!apiKey) return window.useDemoMode();
 
             const btn = document.getElementById('generateBtn');
-            const originalText = btn.innerHTML;
+            // MODIFIED: We no longer capture originalText because it might capture the spinner state if clicked twice rapidly.
+            // Instead we hardcode the reset state.
             btn.innerHTML = `<div class="loader w-4 h-4 border-2 border-white border-t-transparent"></div>`; btn.disabled = true;
             document.getElementById('aiErrorMsg').classList.add('hidden');
 
@@ -1273,6 +1284,11 @@
                     window.loadItineraryFromHistory(result.days, result.meta, null);
                     window.closeModal('aiModal');
                     window.saveCurrentItinerary();
+                    
+                    // FIXED: Force reset button text instead of relying on captured variable
+                    btn.innerHTML = '<span>出發！</span><i class="fa-solid fa-paper-plane"></i>';
+                    btn.disabled = false;
+                    
                     return; // Success exit
 
                 } catch (e) {
@@ -1290,23 +1306,26 @@
             const errorMsgEl = document.getElementById('aiErrorMsg');
             errorMsgEl.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> <span>${lastError ? lastError.message : '發生錯誤'}</span>`;
             errorMsgEl.classList.remove('hidden');
-            btn.innerHTML = originalText; 
+            // FIXED: Force reset button text
+            btn.innerHTML = '<span>出發！</span><i class="fa-solid fa-paper-plane"></i>';
             btn.disabled = false;
         };
 
         window.runMockGeneration = () => {
              const btn = document.getElementById('generateBtn');
-             const originalText = btn.innerHTML;
+             // FIXED: Force reset button text
+             const resetText = '<span>出發！</span><i class="fa-solid fa-paper-plane"></i>';
              btn.innerHTML = `<div class="loader w-4 h-4 border-2 border-white border-t-transparent"></div>`;
              setTimeout(() => {
                  alert("已載入範例！");
-                 btn.innerHTML = originalText;
+                 btn.innerHTML = resetText;
                  window.closeModal('aiModal');
              }, 800);
         };
     </script>
 </body>
 </html>
+
 
 
 
