@@ -853,6 +853,127 @@
             if (routeCoords.length > 1) currentPolyline = L.polyline(routeCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '8, 8' }).addTo(map);
             if (bounds.length > 0) {
                 currentBounds = bounds;
+                setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50] }); }, 200); 
+            }
+            if(isEditMode) updateEditUI();
+        }
+        
+        // Summary & Cost Analysis
+        function renderSummaryView(container) {
+            if (!window.currentItineraryData) {
+                container.innerHTML = '<div class="p-4 text-center text-slate-400">尚無行程資料</div>';
+                return;
+            }
+
+            const header = document.createElement('div'); header.className = "mb-4";
+            header.innerHTML = `<div class="flex items-center gap-2"><h2 class="text-2xl font-bold text-sky-900">🗓️ 行程總覽</h2></div><p class="text-sm text-slate-500 mt-1">全地圖檢視模式</p>`;
+            container.appendChild(header);
+
+            // Safe Access Logic for Metadata
+            const meta = window.currentMetaData || {};
+            const defaultCosts = { total: 0, accommodation: 0, transport: 0, food: 0, currency: 'TWD' };
+            
+            // Merge defaults to prevent undefined crashes
+            const costs = { ...defaultCosts, ...(meta.estimated_costs || {}) };
+
+            const costDiv = document.createElement('div');
+            costDiv.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-4";
+            
+            // Logic for zero costs
+            const hasCosts = (costs.total > 0);
+            const chartHtml = hasCosts ? `<canvas id="costChart"></canvas>` : `<div class="w-full h-full flex items-center justify-center bg-slate-50 rounded-full text-xs text-slate-400 text-center px-1">暫無數據</div>`;
+
+            // Use safe number formatting (0 if undefined/null)
+            const fmt = (num) => (num || 0).toLocaleString();
+
+            costDiv.innerHTML = `
+                <h3 class="font-bold text-sky-800 mb-3"><i class="fa-solid fa-wallet mr-2"></i>預算分析 (估算)</h3>
+                <div class="flex gap-4 items-center">
+                    <div class="w-1/3 relative" style="height:100px; width:100px;">
+                        ${chartHtml}
+                    </div>
+                    <div class="flex-1 space-y-2 text-sm">
+                        <div class="flex justify-between border-b border-slate-50 pb-1"><span>🏠 住宿</span> <span class="font-bold">${fmt(costs.accommodation)} ${costs.currency}</span></div>
+                        <div class="flex justify-between border-b border-slate-50 pb-1"><span>🚆 交通</span> <span class="font-bold">${fmt(costs.transport)} ${costs.currency}</span></div>
+                        <div class="flex justify-between border-b border-slate-50 pb-1"><span>🍱 餐飲</span> <span class="font-bold">${fmt(costs.food)} ${costs.currency}</span></div>
+                        <div class="flex justify-between pt-1 text-sky-600 text-base"><span>💰 總計</span> <span class="font-bold">${fmt(costs.total)} ${costs.currency}</span></div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(costDiv);
+            
+            // Draw Chart only if data exists and canvas is present
+            if (hasCosts) {
+                setTimeout(() => {
+                    const canvas = document.getElementById('costChart');
+                    if (!canvas) return; // Prevent crash if switched away
+                    
+                    const ctx = canvas.getContext('2d');
+                    new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['住宿', '交通', '餐飲'],
+                            datasets: [{
+                                data: [costs.accommodation, costs.transport, costs.food],
+                                backgroundColor: ['#f472b6', '#3b82f6', '#f59e0b'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                }, 100);
+            }
+
+            // Itinerary List
+            const bounds = [];
+            const allRouteCoords = [];
+            let globalStopIndex = 1;
+
+            if (window.currentItineraryData) {
+                Object.keys(window.currentItineraryData).forEach(dayKey => {
+                    const dayData = window.currentItineraryData[dayKey];
+                    if(!dayData) return;
+
+                    const dayHeader = document.createElement('div');
+                    dayHeader.className = "sticky top-0 bg-sky-50/90 backdrop-blur px-3 py-2 rounded-lg font-bold text-sky-800 text-sm border border-sky-100 z-10 mb-2 shadow-sm";
+                    dayHeader.innerHTML = `${getDisplayDate(dayKey)} - ${dayData.title}`;
+                    container.appendChild(dayHeader);
+
+                    if (dayData.stops) {
+                        dayData.stops.forEach((stop) => {
+                            const lat = parseFloat(stop.lat); const lng = parseFloat(stop.lng);
+                            if (!isNaN(lat) && !isNaN(lng)) {
+                                allRouteCoords.push([lat, lng]); bounds.push([lat, lng]);
+                                const item = document.createElement('div');
+                                item.className = "flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100 mb-2";
+                                // Modified: Added Location Badge inside summary list item
+                                const locationText = (meta.main_location) || (meta.country) || '景點';
+                                item.innerHTML = `
+                                    <div class="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shadow-sm shrink-0">${globalStopIndex}</div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-bold text-slate-800 text-sm truncate">${stop.name}</div>
+                                        <div class="text-[10px] text-slate-400 mt-0.5"><i class="fa-solid fa-location-dot text-sky-400"></i> ${locationText}</div>
+                                    </div>
+                                `;
+                                item.onclick = () => { switchDay(dayKey); focusLocation(lat, lng); };
+                                container.appendChild(item);
+
+                                const numberIcon = L.divIcon({ className: 'custom-number-icon', html: `<div class="number-icon">${globalStopIndex}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
+                                const marker = L.marker([lat, lng], { icon: numberIcon }).addTo(map).bindPopup(`<b>${globalStopIndex}. ${stop.name}</b>`);
+                                marker.on('click', () => focusLocation(lat, lng));
+                                markers[stop.id || Math.random()] = marker;
+                                globalStopIndex++;
+                            }
+                        });
+                    }
+                });
+            }
+
+            if (allRouteCoords.length > 1) {
+                currentPolyline = L.polyline(allRouteCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '6, 6' }).addTo(map);
+            }
+            if (bounds.length > 0) {
+                currentBounds = bounds;
                 setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50] }); }, 200);
             }
         }
@@ -1181,6 +1302,7 @@
     </script>
 </body>
 </html>
+
 
 
 
