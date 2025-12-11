@@ -153,10 +153,10 @@
         <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink-0">
             <div class="bg-white/20 p-1.5 sm:p-2.5 rounded-full flex-shrink-0"><i class="fa-solid fa-earth-americas text-xl sm:text-2xl"></i></div>
             <div class="hidden sm:block">
-                <h1 class="font-bold text-lg sm:text-xl leading-tight">全球旅遊 AI 嚮導</h1>
+                <h1 class="font-bold text-lg sm:text-xl leading-tight">全球旅遊嚮導</h1>
                 <p class="text-xs text-sky-100 uppercase tracking-wider flex items-center gap-1">AI Planner <span id="modeBadge" class="bg-white/20 px-1.5 py-0.5 rounded text-[10px]">Cloud</span></p>
             </div>
-            <h1 class="sm:hidden font-bold text-base leading-tight">全球旅遊 AI 嚮導</h1>
+            <h1 class="sm:hidden font-bold text-base leading-tight">旅遊嚮導</h1>
         </div>
         
         <div class="hidden md:flex gap-2 items-center flex-shrink-0">
@@ -1187,8 +1187,7 @@
             if (!apiKey) return window.useDemoMode();
 
             const btn = document.getElementById('generateBtn');
-            // MODIFIED: We no longer capture originalText because it might capture the spinner state if clicked twice rapidly.
-            // Instead we hardcode the reset state.
+            const originalText = btn.innerHTML;
             btn.innerHTML = `<div class="loader w-4 h-4 border-2 border-white border-t-transparent"></div>`; btn.disabled = true;
             document.getElementById('aiErrorMsg').classList.add('hidden');
 
@@ -1278,7 +1277,8 @@
                     }
 
                     const jsonText = part.text;
-                    const result = JSON.parse(jsonText);
+                    const cleanJson = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const result = JSON.parse(cleanJson);
                     
                     result.meta.startDate = startDate;
                     window.loadItineraryFromHistory(result.days, result.meta, null);
@@ -1325,6 +1325,7 @@
     </script>
 </body>
 </html>
+
 
 
 
