@@ -381,7 +381,7 @@
         window.currentItineraryData = null;
         window.currentMetaData = null;
         window.currentDocId = null;
-        let map, markers = {}, currentPolyline = null, currentBounds = null, currentDay = 1;
+        let map, markersLayer = null, currentPolyline = null, currentBounds = null, currentDay = 1;
         let isEditMode = false;
         let weatherCache = {}; 
         
@@ -451,6 +451,8 @@
         function initMap() {
             map = L.map('map', { zoomControl: false }).setView([34.9948, 135.7850], 13);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 20 }).addTo(map);
+            // Updated: Initialize LayerGroup for markers
+            markersLayer = L.layerGroup().addTo(map);
             setTimeout(() => { map.invalidateSize(); }, 200);
         }
         
@@ -810,7 +812,8 @@
             });
             
             const container = document.getElementById('contentList'); container.innerHTML = '';
-            for (let id in markers) map.removeLayer(markers[id]); markers = {};
+            // Updated: Use LayerGroup to clear layers
+            if (markersLayer) markersLayer.clearLayers();
             if (currentPolyline) { map.removeLayer(currentPolyline); currentPolyline = null; }
             
             if (day === 'summary') {
@@ -844,16 +847,17 @@
                 container.appendChild(card);
                 if (!isNaN(lat) && !isNaN(lng)) {
                     const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="marker-pin"></div><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i>`, iconSize: [30, 42], iconAnchor: [15, 42] });
-                    const marker = L.marker([lat, lng], { icon: icon }).addTo(map).bindPopup(stop.name);
+                    // Updated: Add to markersLayer
+                    const marker = L.marker([lat, lng], { icon: icon }).addTo(markersLayer).bindPopup(stop.name);
                     marker.on('click', () => focusLocation(lat, lng));
-                    markers[stop.id || Math.random()] = marker;
+                    // Removed: markers[stop.id || Math.random()] = marker;
                     bounds.push([lat, lng]);
                 }
             });
             if (routeCoords.length > 1) currentPolyline = L.polyline(routeCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '8, 8' }).addTo(map);
             if (bounds.length > 0) {
                 currentBounds = bounds;
-                setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50] }); }, 200); 
+                setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50], animate: true }); }, 200); 
             }
             if(isEditMode) updateEditUI();
         }
@@ -959,9 +963,10 @@
                                 container.appendChild(item);
 
                                 const numberIcon = L.divIcon({ className: 'custom-number-icon', html: `<div class="number-icon">${globalStopIndex}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
-                                const marker = L.marker([lat, lng], { icon: numberIcon }).addTo(map).bindPopup(`<b>${globalStopIndex}. ${stop.name}</b>`);
+                                // Updated: Add to markersLayer
+                                const marker = L.marker([lat, lng], { icon: numberIcon }).addTo(markersLayer).bindPopup(`<b>${globalStopIndex}. ${stop.name}</b>`);
                                 marker.on('click', () => focusLocation(lat, lng));
-                                markers[stop.id || Math.random()] = marker;
+                                // Removed: markers[stop.id || Math.random()] = marker;
                                 globalStopIndex++;
                             }
                         });
@@ -1302,6 +1307,7 @@
     </script>
 </body>
 </html>
+
 
 
 
