@@ -1049,8 +1049,13 @@
             });
             
             const container = document.getElementById('contentList'); container.innerHTML = '';
+            
+            // Clear existing layers
             if (markersLayer) markersLayer.clearLayers();
-            if (currentPolyline) { map.removeLayer(currentPolyline); currentPolyline = null; }
+            if (currentPolyline) { 
+                map.removeLayer(currentPolyline); 
+                currentPolyline = null; 
+            }
             
             if (day === 'summary') {
                 renderSummaryView(container);
@@ -1083,18 +1088,26 @@
                 const locationBadge = `<div class="text-[10px] text-slate-400 mb-1 flex items-center gap-1"><i class="fa-solid fa-location-dot text-sky-400"></i> ${locationLabel}</div>`;
                 
                 // ADDED: Optimize Button in Card Footer
-                const optimizeBtn = `<button onclick="window.optimizeStop(${day}, ${index}); event.stopPropagation();" id="optimize-btn-${stop.id}" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded transition-colors flex items-center gap-1 shadow-sm text-xs"><i class="fa-solid fa-wand-magic-sparkles"></i> 行程交通建議最佳化</button>`;
+                const optimizeBtn = `<button onclick="window.optimizeStop(${day}, ${index}); event.stopPropagation();" id="optimize-btn-${stop.id}" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded transition-colors flex items-center gap-1 shadow-sm text-xs"><i class="fa-solid fa-wand-magic-sparkles"></i> 詳細交通行程建議</button>`;
 
                 card.innerHTML = `<div class="relative"><div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">${index > 0 ? `<button onclick="window.moveStopUp(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="上移"><i class="fa-solid fa-arrow-up"></i></button>` : ''}${index < dayData.stops.length - 1 ? `<button onclick="window.moveStopDown(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="下移"><i class="fa-solid fa-arrow-down"></i></button>` : ''}<button onclick="window.deleteStop(${day}, ${index}); event.stopPropagation();" class="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded text-xs" title="刪除"><i class="fa-solid fa-trash"></i></button></div><div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 group-hover:bg-sky-500 group-hover:text-white transition-colors z-10"><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i></div>${!isLast ? '<div class="w-0.5 h-full bg-slate-100 my-1"></div>' : ''}</div><div class="flex-1 pb-2"><div class="flex justify-between items-start mb-1"><span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full" id="stop-time-${stop.id}">${stop.time || "待定"}</span><div class="flex gap-1">${(stop.tags || []).map(t => `<span class="text-[10px] text-sky-500 bg-sky-50 px-1.5 rounded">${t}</span>`).join('')}</div></div>${locationBadge}<h3 class="text-lg font-bold text-slate-800 mb-1 group-hover:text-sky-600 outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-name-${stop.id}" data-editable>${stop.name}</h3><p class="text-sm text-slate-600 leading-relaxed outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-desc-${stop.id}" data-editable>${stop.desc}</p>${transportHtml}<div class="mt-2 text-xs flex gap-2"><button onclick="window.open('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.name)}&query_place_id=${lat},${lng}', '_blank'); event.stopPropagation();" class="bg-slate-100 hover:bg-green-100 text-slate-600 hover:text-green-700 px-2 py-1 rounded transition-colors"><i class="fa-solid fa-location-arrow"></i> 導航</button>${optimizeBtn}</div></div></div></div>`;
                 container.appendChild(card);
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="marker-pin"></div><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i>`, iconSize: [30, 42], iconAnchor: [15, 42] });
+                    // Update: Use Numbered Icon for Daily View
+                    const icon = L.divIcon({ 
+                        className: 'custom-number-icon', 
+                        html: `<div class="number-icon">${index + 1}</div>`, 
+                        iconSize: [30, 30], 
+                        iconAnchor: [15, 15] 
+                    });
                     const marker = L.marker([lat, lng], { icon: icon }).addTo(markersLayer).bindPopup(stop.name);
                     marker.on('click', () => focusLocation(lat, lng));
                     bounds.push([lat, lng]);
                 }
             });
-            if (routeCoords.length > 1) currentPolyline = L.polyline(routeCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '8, 8' }).addTo(map);
+            if (routeCoords.length > 1) {
+                currentPolyline = L.polyline(routeCoords, { color: '#0ea5e9', weight: 3, opacity: 0.8, dashArray: '8, 8' }).addTo(map);
+            }
             if (bounds.length > 0) {
                 currentBounds = bounds;
                 setTimeout(() => { map.invalidateSize(); if(map.getContainer().offsetWidth > 0) map.fitBounds(bounds, { padding: [50, 50] }); }, 200); 
@@ -1637,6 +1650,7 @@
     </script>
 </body>
 </html>
+
 
 
 
