@@ -78,7 +78,6 @@
             z-index: 100 !important;
         }
 
-        /* Updated: Increased z-index for modals to ensure they overlay map elements */
         #aiModal, #historyModal, #weatherModal, #settingsModal, #shareModal { transition: opacity 0.3s ease-in-out; z-index: 2000; }
         
         #aiModal.hidden, #historyModal.hidden, #weatherModal.hidden, #settingsModal.hidden, #shareModal.hidden { opacity: 0; pointer-events: none; }
@@ -122,11 +121,9 @@
             }
         };
         // Global Triggers
-        // Updated: Force reset button state when opening modal
         window.openAIModal = () => {
             const btn = document.getElementById('generateBtn');
             if(btn) {
-                // HARD RESET: Ensure button text is correct every time modal opens
                 btn.innerHTML = '<span>出發！</span><i class="fa-solid fa-paper-plane"></i>';
                 btn.disabled = false;
             }
@@ -186,7 +183,6 @@
                 <div class="flex gap-2 overflow-x-auto no-scrollbar">
                     <span class="flex items-center gap-1 cursor-pointer hover:bg-sky-100 px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="toggleCurrency()"><i class="fa-solid fa-coins text-sky-600"></i> <span id="headerCurrency" class="font-medium">--</span></span>
                     <span class="flex items-center gap-1 cursor-pointer hover:bg-sky-100 px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="openWeatherModal()"><i class="fa-solid fa-cloud-sun text-sky-600"></i> 天氣</span>
-                    <!-- Location removed from here as requested -->
                 </div>
                 <button id="editToggleBtn" onclick="toggleEditMode()" class="text-sky-600 hover:bg-sky-100 px-3 py-1.5 rounded transition-colors flex items-center gap-2 font-medium shrink-0"><i class="fa-regular fa-pen-to-square"></i> <span id="editBtnText">編輯</span></button>
             </div>
@@ -224,7 +220,6 @@
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
             <div class="bg-sky-600 p-4 flex justify-between items-center text-white shrink-0"><h3 class="font-bold text-lg"><i class="fa-solid fa-share-nodes mr-2"></i>分享行程</h3><button onclick="closeModal('shareModal')" class="text-white/80 hover:text-white p-2"><i class="fa-solid fa-xmark text-2xl"></i></button></div>
             <div class="p-6 space-y-5 overflow-y-auto text-base">
-                <!-- Updated URL -->
                 <button onclick="copyWebLink()" class="w-full py-3.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-bold hover:from-pink-600 hover:to-purple-700 shadow-md flex items-center justify-center gap-2"><i class="fa-solid fa-link text-lg"></i> 複製應用程式連結</button>
                 <div class="border-t border-slate-100 my-2"></div>
                 <button onclick="shareToLine()" class="w-full py-3.5 bg-[#06C755] text-white rounded-xl font-bold hover:bg-[#05b64d] shadow-sm flex items-center justify-center gap-2"><i class="fa-brands fa-line text-xl"></i> 分享到 LINE</button>
@@ -282,7 +277,6 @@
             if(saveBtn) { originalIcon = saveBtn.innerHTML; saveBtn.innerHTML = `<div class="loader w-4 h-4 border-2 border-white border-t-transparent"></div>`; saveBtn.disabled = true; }
 
             try {
-                // Modified: Filename as Country - Title
                 let title = "未命名行程";
                 const day1 = window.currentItineraryData["1"];
                 const meta = window.currentMetaData || {};
@@ -387,7 +381,6 @@
 
     <script>
         const envApiKey = ""; 
-        // const OPENWEATHER_API_KEY = ""; // Removed: Key handled by backend proxy
         window.currentItineraryData = null;
         window.currentMetaData = null;
         window.currentDocId = null;
@@ -410,13 +403,11 @@
             const urlKey = urlParams.get('key');
             if (urlKey) { window.safeStorage.setItem('gemini_api_key', urlKey); window.history.replaceState({}, document.title, window.location.pathname); }
             
-            // Updated Default Data with Country, Location, and Cost Estimates
             const defaultData = {
                 1: { title: "Day 1: 京都初印象", weather: "晴時多雲 24°C", desc: "體驗古都的寧靜與繁華。", stops: [{ id: 101, time: "上午", name: "清水寺", lat: 34.9948, lng: 135.7850, icon: "fa-torii-gate", desc: "京都最著名的古老寺院。", transport: { mode: "巴士", desc: "京都站搭乘 206 號", price: "230 日圓", duration: "20 分", steps: ["前往京都站 D2 乘車處", "搭乘 206 號公車", "五條坂下車"] }, tips: "早點去避開人潮。", tags: ["古蹟"] }] }
             };
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('aiStartDate').value = today;
-            // Added country, main_location, and estimated_costs
             const defaultMeta = { 
                 currency: "1 TWD ≈ 4.7 JPY", 
                 weather_summary: "平均 24°C", 
@@ -461,7 +452,6 @@
         function initMap() {
             map = L.map('map', { zoomControl: false }).setView([34.9948, 135.7850], 13);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 20 }).addTo(map);
-            // Updated: Initialize LayerGroup for markers
             markersLayer = L.layerGroup().addTo(map);
             setTimeout(() => { map.invalidateSize(); }, 200);
         }
@@ -490,8 +480,6 @@
             const currencyEl = document.getElementById('headerCurrency');
             if(meta && meta.currency) currencyEl.innerText = meta.currency;
             else currencyEl.innerText = '匯率未知';
-            
-            // Location removed from header logic
         }
 
         window.fetchWeatherData = async (lat, lng, dayIndex) => {
@@ -499,13 +487,12 @@
             if (weatherCache[cacheKey]) return weatherCache[cacheKey];
             
             try {
-                // Call Cloudflare Pages Function at root path /weather
                 const url = `/weather?lat=${lat}&lon=${lng}`;
                 const response = await fetch(url);
                 
                 if (!response.ok) {
                     if (response.status === 404) {
-                       console.warn("Weather function not found. (Check deployment or local dev)");
+                       console.warn("Weather function not found.");
                        return null;
                     }
                     throw new Error('天氣API查詢失敗');
@@ -524,7 +511,6 @@
             
             const list = weatherData.list;
             const targetDate = new Date();
-            // Assuming Day 1 is "Today" or Metadata Start Date
             if(window.currentMetaData && window.currentMetaData.startDate) {
                 const start = new Date(window.currentMetaData.startDate);
                 targetDate.setTime(start.getTime() + (dayIndex - 1) * 86400000);
@@ -539,9 +525,8 @@
             let isRef = false;
 
             if (dayForecasts.length === 0) {
-                 // Fallback to first available data (Current/Soonest)
                  const current = list[0];
-                 if(!current) return null; // Should not happen if API worked
+                 if(!current) return null;
                  isRef = true;
                  
                  result = {
@@ -587,7 +572,6 @@
         };
         
         window.getClothingSuggestion = (temp, weatherType) => {
-             // Simple Clothing Logic
              if(temp < 10) return "🧥 寒冷：穿厚外套、圍巾";
              if(temp < 20) return "👕 涼爽：薄外套、長袖";
              if(temp < 28) return "👚 舒適：短袖、薄長褲";
@@ -621,8 +605,14 @@
             dayData.stops.forEach(stop => {
                 const nameEl = document.getElementById(`stop-name-${stop.id}`);
                 const descEl = document.getElementById(`stop-desc-${stop.id}`);
+                const transEl = document.getElementById(`stop-trans-desc-${stop.id}`);
+                
                 if(nameEl) stop.name = nameEl.innerText;
                 if(descEl) stop.desc = descEl.innerText;
+                if(transEl && stop.transport) {
+                    if(typeof stop.transport === 'string') stop.transport = transEl.innerText;
+                    else stop.transport.desc = transEl.innerText;
+                }
             });
             window.saveCurrentItinerary();
         }
@@ -642,7 +632,6 @@
                     window.currentMetaData.currency = newStr;
                     updateHeader(window.currentMetaData);
 
-                    // Update Estimated Costs Logic
                     if (window.currentMetaData.estimated_costs) {
                         const costs = window.currentMetaData.estimated_costs;
                         const factor = 1 / rate;
@@ -653,11 +642,10 @@
                         costs.currency = source;
                     }
 
-                    // Refresh Summary if active
                     if (currentDay === 'summary') {
-                         const container = document.getElementById('contentList');
-                         container.innerHTML = '';
-                         renderSummaryView(container);
+                          const container = document.getElementById('contentList');
+                          container.innerHTML = '';
+                          renderSummaryView(container);
                     }
                 }
             }
@@ -703,7 +691,6 @@
             window.open('https://line.me/R/msg/text/?' + encodeURIComponent(text));
         };
 
-        // Weather with Location Accuracy
         window.openWeatherModal = async () => {
             const list = document.getElementById('weatherList'); 
             list.innerHTML = '<div class="text-center text-slate-400 mt-10">載入中...</div>'; 
@@ -712,12 +699,10 @@
             list.innerHTML = '';
             let dayIndex = 1;
             
-            // Iterate through days and use the first stop location for each day
             for (let dayKey of Object.keys(window.currentItineraryData)) {
                 const day = window.currentItineraryData[dayKey];
                 let lat, lng;
                 
-                // Get location for THIS day
                 if (day.stops && day.stops.length > 0) {
                     lat = day.stops[0].lat;
                     lng = day.stops[0].lng;
@@ -769,7 +754,7 @@
                         item.innerHTML = `<div class="flex justify-between"><span class="text-xs font-bold text-orange-500">${displayDate}</span><span class="text-xs text-slate-400">無預報資料</span></div>`;
                     }
                 } else {
-                     item.innerHTML = `<div class="flex justify-between"><span class="text-xs font-bold text-orange-500">${displayDate}</span><span class="text-xs text-slate-400">無地點資料</span></div>`;
+                      item.innerHTML = `<div class="flex justify-between"><span class="text-xs font-bold text-orange-500">${displayDate}</span><span class="text-xs text-slate-400">無地點資料</span></div>`;
                 }
                 list.appendChild(item);
                 dayIndex++;
@@ -799,7 +784,7 @@
                 const btn = document.createElement('button');
                 btn.className = `day-btn flex-1 min-w-[70px] py-2 rounded-lg text-center transition-all text-xs font-bold ${day == currentDay ? 'bg-sky-500 text-white shadow-md' : 'bg-slate-100 text-slate-600'}`;
                 btn.dataset.day = day; btn.onclick = () => switchDay(day);
-                // Modified: Add location to Day tab
+                
                 const locationText = window.currentMetaData.main_location ? window.currentMetaData.main_location.split(',')[1] || window.currentMetaData.main_location : (window.currentMetaData.country || '行程');
                 btn.innerHTML = `${getDisplayDate(day)}<br><span class="font-normal opacity-80 text-[10px] truncate block px-1">${locationText}</span>`;
                 container.appendChild(btn);
@@ -822,7 +807,6 @@
             });
             
             const container = document.getElementById('contentList'); container.innerHTML = '';
-            // Updated: Use LayerGroup to clear layers
             if (markersLayer) markersLayer.clearLayers();
             if (currentPolyline) { map.removeLayer(currentPolyline); currentPolyline = null; }
             
@@ -845,22 +829,26 @@
                 const card = document.createElement('div');
                 card.className = "card-hover bg-white rounded-xl p-4 border border-slate-200 cursor-pointer transition-all relative overflow-hidden group";
                 card.onclick = () => { if(isEditMode) return; focusLocation(lat, lng); };
-                let transportHtml = '';
-                if (stop.transport) {
-                   const trans = typeof stop.transport === 'string' ? stop.transport : stop.transport.desc;
-                   transportHtml = `<div class="mt-2 text-xs bg-sky-50 p-1 rounded text-sky-600"><i class="fa-solid fa-train"></i> <span id="stop-trans-desc-${stop.id}" data-editable>${trans}</span></div>`;
-                }
-                // Modified: Added Location Badge inside card
-                const locationBadge = `<div class="text-[10px] text-slate-400 mb-1 flex items-center gap-1"><i class="fa-solid fa-location-dot text-sky-400"></i> ${window.currentMetaData.main_location || window.currentMetaData.country || '景點'}</div>`;
                 
-                card.innerHTML = `<div class="relative"><div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">${index > 0 ? `<button onclick="window.moveStopUp(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="上移"><i class="fa-solid fa-arrow-up"></i></button>` : ''}${index < dayData.stops.length - 1 ? `<button onclick="window.moveStopDown(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="下移"><i class="fa-solid fa-arrow-down"></i></button>` : ''}<button onclick="window.deleteStop(${day}, ${index}); event.stopPropagation();" class="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded text-xs" title="刪除"><i class="fa-solid fa-trash"></i></button></div><div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 group-hover:bg-sky-500 group-hover:text-white transition-colors z-10"><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i></div>${!isLast ? '<div class="w-0.5 h-full bg-slate-100 my-1"></div>' : ''}</div><div class="flex-1 pb-2"><div class="flex justify-between items-start mb-1"><span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">${stop.time}</span><div class="flex gap-1">${(stop.tags || []).map(t => `<span class="text-[10px] text-sky-500 bg-sky-50 px-1.5 rounded">${t}</span>`).join('')}</div></div>${locationBadge}<h3 class="text-lg font-bold text-slate-800 mb-1 group-hover:text-sky-600 outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-name-${stop.id}" data-editable>${stop.name}</h3><p class="text-sm text-slate-600 leading-relaxed outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-desc-${stop.id}" data-editable>${stop.desc}</p>${transportHtml}<div class="mt-2 text-xs flex gap-2"><button onclick="window.open('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.name)}&query_place_id=${lat},${lng}', '_blank'); event.stopPropagation();" class="bg-slate-100 hover:bg-green-100 text-slate-600 hover:text-green-700 px-2 py-1 rounded transition-colors"><i class="fa-solid fa-location-arrow"></i> 導航</button></div></div></div></div>`;
+                let transportHtml = '';
+                // Modified: Ensure transport shows even if empty, so it can be edited if added by map
+                const transportData = stop.transport || { mode: "自行前往", desc: "點擊編輯交通方式", price: "" };
+                const transDesc = typeof transportData === 'string' ? transportData : transportData.desc;
+                transportHtml = `<div class="mt-2 text-xs bg-sky-50 p-1 rounded text-sky-600"><i class="fa-solid fa-train"></i> <span id="stop-trans-desc-${stop.id}" data-editable>${transDesc}</span></div>`;
+
+                // Modified: Dynamic Location Logic - Check stop.location_label first
+                const locationLabel = stop.location_label || window.currentMetaData.main_location || window.currentMetaData.country || '景點';
+                const locationBadge = `<div class="text-[10px] text-slate-400 mb-1 flex items-center gap-1"><i class="fa-solid fa-location-dot text-sky-400"></i> ${locationLabel}</div>`;
+                
+                // ADDED: Optimize Button in Card Footer
+                const optimizeBtn = `<button onclick="window.optimizeStop(${day}, ${index}); event.stopPropagation();" id="optimize-btn-${stop.id}" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded transition-colors flex items-center gap-1 shadow-sm text-xs"><i class="fa-solid fa-wand-magic-sparkles"></i> 智能優化</button>`;
+
+                card.innerHTML = `<div class="relative"><div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">${index > 0 ? `<button onclick="window.moveStopUp(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="上移"><i class="fa-solid fa-arrow-up"></i></button>` : ''}${index < dayData.stops.length - 1 ? `<button onclick="window.moveStopDown(${day}, ${index}); event.stopPropagation();" class="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded text-xs" title="下移"><i class="fa-solid fa-arrow-down"></i></button>` : ''}<button onclick="window.deleteStop(${day}, ${index}); event.stopPropagation();" class="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded text-xs" title="刪除"><i class="fa-solid fa-trash"></i></button></div><div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 group-hover:bg-sky-500 group-hover:text-white transition-colors z-10"><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i></div>${!isLast ? '<div class="w-0.5 h-full bg-slate-100 my-1"></div>' : ''}</div><div class="flex-1 pb-2"><div class="flex justify-between items-start mb-1"><span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full" id="stop-time-${stop.id}">${stop.time || "待定"}</span><div class="flex gap-1">${(stop.tags || []).map(t => `<span class="text-[10px] text-sky-500 bg-sky-50 px-1.5 rounded">${t}</span>`).join('')}</div></div>${locationBadge}<h3 class="text-lg font-bold text-slate-800 mb-1 group-hover:text-sky-600 outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-name-${stop.id}" data-editable>${stop.name}</h3><p class="text-sm text-slate-600 leading-relaxed outline-none rounded px-1 -ml-1 border border-transparent transition-all" id="stop-desc-${stop.id}" data-editable>${stop.desc}</p>${transportHtml}<div class="mt-2 text-xs flex gap-2"><button onclick="window.open('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.name)}&query_place_id=${lat},${lng}', '_blank'); event.stopPropagation();" class="bg-slate-100 hover:bg-green-100 text-slate-600 hover:text-green-700 px-2 py-1 rounded transition-colors"><i class="fa-solid fa-location-arrow"></i> 導航</button>${optimizeBtn}</div></div></div></div>`;
                 container.appendChild(card);
                 if (!isNaN(lat) && !isNaN(lng)) {
                     const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="marker-pin"></div><i class="fa-solid ${stop.icon || 'fa-map-pin'}"></i>`, iconSize: [30, 42], iconAnchor: [15, 42] });
-                    // Updated: Add to markersLayer
                     const marker = L.marker([lat, lng], { icon: icon }).addTo(markersLayer).bindPopup(stop.name);
                     marker.on('click', () => focusLocation(lat, lng));
-                    // Removed: markers[stop.id || Math.random()] = marker;
                     bounds.push([lat, lng]);
                 }
             });
@@ -871,6 +859,80 @@
             }
             if(isEditMode) updateEditUI();
         }
+        
+        // ADDED: Single Stop Optimization Logic
+        window.optimizeStop = async (day, index) => {
+            const apiKey = window.safeStorage.getItem('gemini_api_key') || envApiKey;
+            if (!apiKey) return window.openSettingsModal();
+
+            const dayData = window.currentItineraryData[day];
+            const stop = dayData.stops[index];
+            const btn = document.getElementById(`optimize-btn-${stop.id}`);
+            if(!btn) return;
+            
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<div class="loader w-3 h-3 border-2 border-white border-t-transparent"></div> 分析中`;
+            btn.disabled = true;
+
+            // Determine context
+            let prevLocation = "住宿處/市中心";
+            if(index > 0) {
+                prevLocation = dayData.stops[index-1].name;
+            }
+            const currentLoc = stop.name;
+            const city = stop.location_label || window.currentMetaData.main_location || "該城市";
+
+            const prompt = `
+            我是旅遊規劃助手。請分析從「${prevLocation}」到「${currentLoc}」（位於 ${city}）的交通方式與建議。
+            
+            請回傳 JSON 格式：
+            {
+                "time": "建議遊玩時段 (例如：上午 10:00 或 傍晚)",
+                "transport": {
+                    "mode": "交通工具 (例如：地鐵 / 步行 / 計程車)",
+                    "desc": "詳細路線說明 (包含預估時間)",
+                    "price": "預估費用"
+                }
+            }
+            `;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.candidates && data.candidates.length > 0) {
+                    const text = data.candidates[0].content.parts[0].text;
+                    const json = JSON.parse(text);
+                    
+                    // Update Data
+                    stop.time = json.time;
+                    stop.transport = json.transport;
+                    
+                    // Refresh View
+                    window.saveCurrentItinerary();
+                    window.showToast("已更新交通與時間建議！");
+                    switchDay(day);
+                } else {
+                    throw new Error("No data");
+                }
+            } catch (e) {
+                console.error(e);
+                window.showToast("優化失敗，請稍後再試");
+            } finally {
+                // Button state will be reset by switchDay re-render, but just in case:
+                if(document.getElementById(`optimize-btn-${stop.id}`)) {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            }
+        };
         
         // Summary & Cost Analysis
         function renderSummaryView(container) {
@@ -883,21 +945,14 @@
             header.innerHTML = `<div class="flex items-center gap-2"><h2 class="text-2xl font-bold text-sky-900">🗓️ 行程總覽</h2></div><p class="text-sm text-slate-500 mt-1">全地圖檢視模式</p>`;
             container.appendChild(header);
 
-            // Safe Access Logic for Metadata
             const meta = window.currentMetaData || {};
             const defaultCosts = { total: 0, accommodation: 0, transport: 0, food: 0, currency: 'TWD' };
-            
-            // Merge defaults to prevent undefined crashes
             const costs = { ...defaultCosts, ...(meta.estimated_costs || {}) };
 
             const costDiv = document.createElement('div');
             costDiv.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-4";
-            
-            // Logic for zero costs
             const hasCosts = (costs.total > 0);
             const chartHtml = hasCosts ? `<canvas id="costChart"></canvas>` : `<div class="w-full h-full flex items-center justify-center bg-slate-50 rounded-full text-xs text-slate-400 text-center px-1">暫無數據</div>`;
-
-            // Use safe number formatting (0 if undefined/null)
             const fmt = (num) => (num || 0).toLocaleString();
 
             costDiv.innerHTML = `
@@ -916,12 +971,10 @@
             `;
             container.appendChild(costDiv);
             
-            // Draw Chart only if data exists and canvas is present
             if (hasCosts) {
                 setTimeout(() => {
                     const canvas = document.getElementById('costChart');
-                    if (!canvas) return; // Prevent crash if switched away
-                    
+                    if (!canvas) return; 
                     const ctx = canvas.getContext('2d');
                     new Chart(ctx, {
                         type: 'doughnut',
@@ -960,23 +1013,22 @@
                                 allRouteCoords.push([lat, lng]); bounds.push([lat, lng]);
                                 const item = document.createElement('div');
                                 item.className = "flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100 mb-2";
-                                // Modified: Added Location Badge inside summary list item
-                                const locationText = (meta.main_location) || (meta.country) || '景點';
+                                // Modified: Use specific location label if available
+                                const locationLabel = stop.location_label || meta.main_location || meta.country || '景點';
+                                
                                 item.innerHTML = `
                                     <div class="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold shadow-sm shrink-0">${globalStopIndex}</div>
                                     <div class="flex-1 min-w-0">
                                         <div class="font-bold text-slate-800 text-sm truncate">${stop.name}</div>
-                                        <div class="text-[10px] text-slate-400 mt-0.5"><i class="fa-solid fa-location-dot text-sky-400"></i> ${locationText}</div>
+                                        <div class="text-[10px] text-slate-400 mt-0.5"><i class="fa-solid fa-location-dot text-sky-400"></i> ${locationLabel}</div>
                                     </div>
                                 `;
                                 item.onclick = () => { switchDay(dayKey); focusLocation(lat, lng); };
                                 container.appendChild(item);
 
                                 const numberIcon = L.divIcon({ className: 'custom-number-icon', html: `<div class="number-icon">${globalStopIndex}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
-                                // Updated: Add to markersLayer
                                 const marker = L.marker([lat, lng], { icon: numberIcon }).addTo(markersLayer).bindPopup(`<b>${globalStopIndex}. ${stop.name}</b>`);
                                 marker.on('click', () => focusLocation(lat, lng));
-                                // Removed: markers[stop.id || Math.random()] = marker;
                                 globalStopIndex++;
                             }
                         });
@@ -993,7 +1045,6 @@
             }
         }
 
-        // Pure AI Tips - No Lookup Table
         async function renderTips() {
             const container = document.getElementById('contentList');
             container.innerHTML = '<div class="p-4 text-center"><div class="loader mx-auto mb-3"></div><p class="text-slate-500">AI 正在分析行程地點並生成專屬建議...</p></div>';
@@ -1004,7 +1055,6 @@
                 return;
             }
 
-            // Extract all unique locations
             const locations = new Set();
             Object.values(window.currentItineraryData).forEach(day => {
                 day.stops.forEach(stop => locations.add(stop.name));
@@ -1031,7 +1081,6 @@
             }
             `;
 
-            // Retry Loop Logic
             const maxRetries = 3;
             let lastError = null;
 
@@ -1043,7 +1092,6 @@
                         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                     });
 
-                    // Handle 429 Quota Exceeded
                     if (response.status === 429) {
                         const retryAfter = 5000 * Math.pow(2, attempt); 
                         console.warn(`Quota exceeded (429). Retrying in ${retryAfter}ms...`);
@@ -1059,7 +1107,6 @@
                     const data = await response.json();
                     
                     if (data.error) {
-                        // Check specifically for quota error in body if status wasn't 429
                         if (data.error.code === 429 || (data.error.message && data.error.message.includes('quota'))) {
                              const retryAfter = 5000 * Math.pow(2, attempt);
                              console.warn(`Quota error in body. Retrying in ${retryAfter}ms...`);
@@ -1099,19 +1146,17 @@
                             <div class="bg-sky-50 p-4 rounded-lg border border-sky-100"><h4 class="font-bold text-sky-800 mb-1">✨ 專屬建議</h4><p class="text-sm text-sky-900">${tips.specific_advice}</p></div>
                         </div>
                     `;
-                    return; // Success exit
+                    return; 
 
                 } catch (e) {
                     console.error(`Attempt ${attempt + 1} failed:`, e);
                     lastError = e;
                     if (attempt < maxRetries && !e.message.includes('quota')) { 
-                         // Backoff for other non-quota errors (e.g. network blip)
                          await new Promise(r => setTimeout(r, 2000));
                     }
                 }
             }
 
-            // Final Error Display
             container.innerHTML = `<div class="p-4 text-center text-red-500">
                 <i class="fa-solid fa-circle-exclamation text-2xl mb-2"></i><br>
                 分析失敗<br>
@@ -1124,13 +1169,15 @@
             if (map.getContainer().offsetWidth > 0) map.flyTo([lat, lng], 16, { duration: 1 });
         }
         
+        // Updated Search with address details for better location labeling
         window.searchMapLocation = async () => {
             const query = document.getElementById('mapSearchInput').value.trim();
             if (!query) return window.showToast("請輸入搜尋地點");
             const resultsDiv = document.getElementById('mapSearchResults');
             resultsDiv.innerHTML = '<div class="p-3 text-center text-slate-500 text-sm">搜尋中...</div>'; resultsDiv.classList.remove('hidden');
             try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`);
+                // Request addressdetails=1 to get Country, City etc.
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`);
                 const results = await response.json();
                 if (results.length === 0) { resultsDiv.innerHTML = '<div class="p-3 text-center text-slate-400 text-sm">無結果</div>'; return; }
                 resultsDiv.innerHTML = '';
@@ -1138,30 +1185,52 @@
                     const item = document.createElement('div');
                     item.className = "p-3 border-b border-slate-100 hover:bg-sky-50 cursor-pointer text-sm font-bold text-slate-700";
                     item.innerText = result.display_name.split(',')[0];
+                    
+                    // Extract Location Label (Country, City)
+                    let locLabel = "";
+                    if (result.address) {
+                        const country = result.address.country || "";
+                        const city = result.address.city || result.address.town || result.address.village || result.address.county || "";
+                        if (country && city) locLabel = `${country}, ${city}`;
+                        else locLabel = country || city;
+                    }
+
                     item.onclick = () => {
                         const lat = parseFloat(result.lat); const lng = parseFloat(result.lon);
                         focusLocation(lat, lng); resultsDiv.classList.add('hidden');
-                        showAddToItineraryPrompt(result.display_name.split(',')[0], lat, lng);
+                        showAddToItineraryPrompt(result.display_name.split(',')[0], lat, lng, locLabel);
                     };
                     resultsDiv.appendChild(item);
                 });
             } catch (err) { resultsDiv.innerHTML = '<div class="p-3 text-center text-red-500 text-sm">錯誤</div>'; }
         };
 
-        window.showAddToItineraryPrompt = (placeName, lat, lng) => {
+        window.showAddToItineraryPrompt = (placeName, lat, lng, locLabel) => {
             const container = document.getElementById('contentList');
             const promptDiv = document.createElement('div');
             promptDiv.className = "bg-gradient-to-r from-sky-50 to-blue-50 border-2 border-sky-300 rounded-xl p-4 mb-4 sticky top-0 z-20 shadow-md";
             promptDiv.innerHTML = `
-                <div class="flex items-center gap-3 mb-3"><i class="fa-solid fa-location-dot text-sky-600 text-xl"></i><div class="flex-1"><div class="font-bold text-slate-800">${placeName}</div><div class="text-xs text-slate-500">座標: ${lat.toFixed(4)}, ${lng.toFixed(4)}</div></div></div>
-                <div class="flex gap-2"><select id="addToDaySelect" class="flex-1 px-3 py-2 border border-sky-200 rounded-lg text-sm outline-none">${Object.keys(window.currentItineraryData).map(day => `<option value="${day}">第 ${day} 天</option>`).join('')}</select><button onclick="window.confirmAddToItinerary('${placeName}', ${lat}, ${lng})" class="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-bold text-sm"><i class="fa-solid fa-plus"></i> 加入</button><button onclick="this.closest('.sticky').remove()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-sm"><i class="fa-solid fa-times"></i></button></div>
+                <div class="flex items-center gap-3 mb-3"><i class="fa-solid fa-location-dot text-sky-600 text-xl"></i><div class="flex-1"><div class="font-bold text-slate-800">${placeName}</div><div class="text-xs text-slate-500">座標: ${lat.toFixed(4)}, ${lng.toFixed(4)}</div><div class="text-xs text-sky-600 mt-0.5">${locLabel ? `(${locLabel})` : ''}</div></div></div>
+                <div class="flex gap-2"><select id="addToDaySelect" class="flex-1 px-3 py-2 border border-sky-200 rounded-lg text-sm outline-none">${Object.keys(window.currentItineraryData).map(day => `<option value="${day}">第 ${day} 天</option>`).join('')}</select><button onclick="window.confirmAddToItinerary('${placeName}', ${lat}, ${lng}, '${locLabel}')" class="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-bold text-sm"><i class="fa-solid fa-plus"></i> 加入</button><button onclick="this.closest('.sticky').remove()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-sm"><i class="fa-solid fa-times"></i></button></div>
             `;
             container.prepend(promptDiv);
         };
         
-        window.confirmAddToItinerary = (placeName, lat, lng) => {
+        window.confirmAddToItinerary = (placeName, lat, lng, locLabel) => {
             const day = document.getElementById('addToDaySelect').value;
-            window.currentItineraryData[day].stops.push({ id: Date.now(), time: "待定", name: placeName, lat: lat, lng: lng, icon: "fa-map-pin", desc: "在地圖上搜尋的地點", tags: ["新增"] });
+            // Add default transport/time so it's editable
+            window.currentItineraryData[day].stops.push({ 
+                id: Date.now(), 
+                time: "待定", 
+                name: placeName, 
+                lat: lat, 
+                lng: lng, 
+                icon: "fa-map-pin", 
+                desc: "在地圖上搜尋的地點", 
+                tags: ["新增"],
+                location_label: locLabel, // Store specific location context
+                transport: { mode: "自行前往", desc: "點擊編輯交通方式", price: "" } 
+            });
             window.saveCurrentItinerary(); window.showToast("已加入行程！"); switchDay(day);
             if(window.innerWidth < 768) toggleMobileView('list');
         };
@@ -1208,19 +1277,20 @@
                        "title": "Day Title", "weather": "Forecast", "desc": "Description", 
                        "stops": [ { 
                            "id": 1, "time": "Morning", "name": "Place Name", "lat": 35.0, "lng": 135.0, "icon": "fa-landmark", "desc": "Short Desc", 
+                           "location_label": "City, Country", // IMPORTANT: Specific location for this stop
                            "transport": { "mode": "Bus", "desc": "Details", "price": "100" }, 
                            "tags": ["Tag"] 
                        } ] 
                     }
                  }
                }
-            3. "estimated_costs" is MANDATORY. Estimate realistic costs for the whole trip in local currency.
+            3. "estimated_costs" is MANDATORY. Estimate realistic costs.
             4. "main_location" MUST be "Country, City" format.
-            5. Coordinates must be real.
-            6. Language: Traditional Chinese.
+            5. "location_label" in stops is important if the stop is in a different city/country than main_location.
+            6. Coordinates must be real.
+            7. Language: Traditional Chinese.
             `;
 
-            // Retry Loop Logic for Generate Itinerary
             const maxRetries = 3;
             let lastError = null;
 
@@ -1236,7 +1306,6 @@
                         })
                     });
 
-                    // Handle 429 Quota Exceeded
                     if (response.status === 429) {
                         const retryAfter = 5000 * Math.pow(2, attempt); 
                         console.warn(`Quota exceeded (429). Retrying in ${retryAfter}ms...`);
@@ -1252,7 +1321,6 @@
                     const data = await response.json();
                     
                     if (data.error) {
-                        // Check specifically for quota error in body if status wasn't 429
                         if (data.error.code === 429 || (data.error.message && data.error.message.includes('quota'))) {
                              const retryAfter = 5000 * Math.pow(2, attempt);
                              console.warn(`Quota error in body. Retrying in ${retryAfter}ms...`);
@@ -1285,35 +1353,30 @@
                     window.closeModal('aiModal');
                     window.saveCurrentItinerary();
                     
-                    // FIXED: Force reset button text instead of relying on captured variable
                     btn.innerHTML = '<span>出發！</span><i class="fa-solid fa-paper-plane"></i>';
                     btn.disabled = false;
                     
-                    return; // Success exit
+                    return; 
 
                 } catch (e) {
                     console.error(`Attempt ${attempt + 1} failed:`, e);
                     lastError = e;
                     if (attempt < maxRetries && !e.message.includes('quota')) { 
-                         // Backoff for other non-quota errors (e.g. network blip)
                          await new Promise(r => setTimeout(r, 2000));
                     }
                 }
             }
 
-            // Final Error Display
             console.error(lastError);
             const errorMsgEl = document.getElementById('aiErrorMsg');
             errorMsgEl.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> <span>${lastError ? lastError.message : '發生錯誤'}</span>`;
             errorMsgEl.classList.remove('hidden');
-            // FIXED: Force reset button text
             btn.innerHTML = '<span>出發！</span><i class="fa-solid fa-paper-plane"></i>';
             btn.disabled = false;
         };
 
         window.runMockGeneration = () => {
              const btn = document.getElementById('generateBtn');
-             // FIXED: Force reset button text
              const resetText = '<span>出發！</span><i class="fa-solid fa-paper-plane"></i>';
              btn.innerHTML = `<div class="loader w-4 h-4 border-2 border-white border-t-transparent"></div>`;
              setTimeout(() => {
@@ -1325,6 +1388,7 @@
     </script>
 </body>
 </html>
+
 
 
 
