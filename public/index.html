@@ -1389,7 +1389,13 @@
                                 item.onclick = () => { switchDay(dayKey); focusLocation(lat, lng); };
                                 container.appendChild(item);
 
-                                const numberIcon = L.divIcon({ className: 'custom-number-icon', html: `<div class="number-icon">${globalStopIndex}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
+                                // Update: Use Numbered Icon with Label for Summary View
+                                const numberIcon = L.divIcon({ 
+                                    className: 'custom-number-icon', 
+                                    html: `<div class="relative"><div class="number-icon">${globalStopIndex}</div><div class="marker-label">${stop.name}</div></div>`, 
+                                    iconSize: [30, 30], 
+                                    iconAnchor: [15, 15] 
+                                });
                                 const marker = L.marker([lat, lng], { icon: numberIcon }).addTo(markersLayer).bindPopup(`<b>${globalStopIndex}. ${stop.name}</b>`);
                                 marker.on('click', () => focusLocation(lat, lng));
                                 globalStopIndex++;
@@ -1412,6 +1418,12 @@
             const container = document.getElementById('contentList');
             container.innerHTML = '<div class="p-4 text-center"><div class="loader mx-auto mb-3"></div><p class="text-slate-500">AI 正在分析行程地點並生成專屬建議...</p></div>';
             
+            // Check cache first (New Feature)
+            if (window.currentMetaData && window.currentMetaData.ai_tips) {
+                renderTipsView(container, window.currentMetaData.ai_tips);
+                return;
+            }
+
             const apiKey = window.safeStorage.getItem('gemini_api_key');
             if (!apiKey) {
                 container.innerHTML = `<div class="p-4 text-center"><p class="text-slate-500">請先連結 AI 以獲取即時分析提示。</p><button onclick="openSettingsModal()" class="mt-2 text-sky-500 font-bold">前往設定</button></div>`;
@@ -1498,17 +1510,13 @@
                     if (!jsonMatch) throw new Error("無法解析 JSON");
                     const tips = JSON.parse(jsonMatch[0]);
                     
-                    container.innerHTML = `
-                        <div class="p-4 space-y-4">
-                            <div class="flex items-center gap-2"><h2 class="text-2xl font-bold text-sky-900">💡 ${tips.country} 旅遊提示</h2><span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded">AI 生成</span></div>
-                            <div class="bg-amber-50 p-4 rounded-lg border border-amber-100"><h4 class="font-bold text-amber-800 mb-1">🛡️ 治安</h4><p class="text-sm text-amber-900">${tips.safety}</p></div>
-                            <div class="bg-red-50 p-4 rounded-lg border border-red-100"><h4 class="font-bold text-red-800 mb-1">🏥 健康與醫療</h4><p class="text-sm text-red-900">${tips.health}</p></div>
-                            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100"><h4 class="font-bold text-blue-800 mb-1">🤝 風俗</h4><p class="text-sm text-blue-900">${tips.customs}</p></div>
-                            <div class="bg-green-50 p-4 rounded-lg border border-green-100"><h4 class="font-bold text-green-800 mb-1">🚆 交通</h4><p class="text-sm text-green-900">${tips.transport_tips}</p></div>
-                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-100"><h4 class="font-bold text-gray-800 mb-1">💰 稅務與小費</h4><p class="text-sm text-gray-900">${tips.tipping_tax}</p></div>
-                            <div class="bg-sky-50 p-4 rounded-lg border border-sky-100"><h4 class="font-bold text-sky-800 mb-1">✨ 專屬建議</h4><p class="text-sm text-sky-900">${tips.specific_advice}</p></div>
-                        </div>
-                    `;
+                    // Save tips to metadata and persist
+                    if (!window.currentMetaData) window.currentMetaData = {};
+                    window.currentMetaData.ai_tips = tips;
+                    window.saveCurrentItinerary(); // Persist to database/local storage
+                    window.showToast("AI 提示已儲存");
+
+                    renderTipsView(container, tips);
                     return; 
 
                 } catch (e) {
@@ -1526,6 +1534,32 @@
                 <span class="text-xs text-slate-400">${lastError ? lastError.message : '未知錯誤'}</span>
             </div>`;
         }
+
+        // Helper function to render tips HTML
+        function renderTipsView(container, tips) {
+            container.innerHTML = `
+                <div class="p-4 space-y-4">
+                    <div class="flex items-center gap-2"><h2 class="text-2xl font-bold text-sky-900">💡 ${tips.country} 旅遊提示</h2><span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded">AI 生成</span></div>
+                    <div class="bg-amber-50 p-4 rounded-lg border border-amber-100"><h4 class="font-bold text-amber-800 mb-1">🛡️ 治安</h4><p class="text-sm text-amber-900">${tips.safety}</p></div>
+                    <div class="bg-red-50 p-4 rounded-lg border border-red-100"><h4 class="font-bold text-red-800 mb-1">🏥 健康與醫療</h4><p class="text-sm text-red-900">${tips.health}</p></div>
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-100"><h4 class="font-bold text-blue-800 mb-1">🤝 風俗</h4><p class="text-sm text-blue-900">${tips.customs}</p></div>
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-100"><h4 class="font-bold text-green-800 mb-1">🚆 交通</h4><p class="text-sm text-green-900">${tips.transport_tips}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-100"><h4 class="font-bold text-gray-800 mb-1">💰 稅務與小費</h4><p class="text-sm text-gray-900">${tips.tipping_tax}</p></div>
+                    <div class="bg-sky-50 p-4 rounded-lg border border-sky-100"><h4 class="font-bold text-sky-800 mb-1">✨ 專屬建議</h4><p class="text-sm text-sky-900">${tips.specific_advice}</p></div>
+                    <div class="text-center pt-4 border-t border-slate-100">
+                        <button onclick="window.regenerateTips()" class="text-sm text-slate-400 hover:text-sky-600 flex items-center justify-center gap-1 w-full"><i class="fa-solid fa-rotate-right"></i> <span>行程有變更？重新分析</span></button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Function to force regenerate tips (clear cache)
+        window.regenerateTips = () => {
+            if (window.currentMetaData) {
+                delete window.currentMetaData.ai_tips;
+                window.renderTips();
+            }
+        };
         
         function focusLocation(lat, lng) {
             map.invalidateSize(); 
@@ -1752,6 +1786,7 @@
     </script>
 </body>
 </html>
+
 
 
 
