@@ -1110,7 +1110,7 @@
                 const locationBadge = `<div class="text-[10px] text-slate-400 mb-1 flex items-center gap-1"><i class="fa-solid fa-location-dot text-sky-400"></i> ${locationLabel}</div>`;
                 
                 // ADDED: Optimize Button in Card Footer
-                const optimizeBtn = `<button onclick="window.optimizeStop(${day}, ${index}); event.stopPropagation();" id="optimize-btn-${stop.id}" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded transition-colors flex items-center gap-1 shadow-sm text-xs"><i class="fa-solid fa-wand-magic-sparkles"></i> 智能優化</button>`;
+                const optimizeBtn = `<button onclick="window.optimizeStop(${day}, ${index}); event.stopPropagation();" id="optimize-btn-${stop.id}" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded transition-colors flex items-center gap-1 shadow-sm text-xs"><i class="fa-solid fa-wand-magic-sparkles"></i> 詳細交通行程</button>`;
                 // ADDED: Fix Location Button
                 const fixLocBtn = `<button onclick="window.autoFixLocation(${day}, ${index}); event.stopPropagation();" id="fix-loc-btn-${stop.id}" class="bg-slate-200 hover:bg-slate-300 text-slate-600 px-2 py-1 rounded transition-colors flex items-center gap-1 shadow-sm text-xs"><i class="fa-solid fa-map-location-dot"></i> 校正座標</button>`;
 
@@ -1786,6 +1786,7 @@
     </script>
 </body>
 </html>
+
 
 
 
